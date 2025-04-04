@@ -18,6 +18,7 @@ document.addEventListener("DOMContentLoaded", (e) => {
   app = new c.AppController("Lab@Home WebUI", CONST.WS_URL, GOOGLE_API_KEY, true, `:: Board ${CFG.BOARD_NAME} created at  ${CFG.CREATION_DT_STR} `);
   app.AddScreenController("dashboard", new RegExp("^/$"), html`<span>&#127760;</span><span>Home</span>`, new c.DefaultScreenController(app))
   app.AddScreenController("fbd", new RegExp("^/fbd$"), html`<span>🥽</span><span>Function Block</span>`, new c.DevelopCFCController(app))
+  app.AddScreenController("als", new RegExp("^/als$"), html`<span>🥽</span><span>Ablaufsprache</span>`, new c.HelloWorldController(app));
   app.AddScreenController("heater", new RegExp("^/heater$"), html`<span>🥽</span><span>Control Heater</span>`, new c.HeaterExperimentController(app))
   app.AddScreenController("system", new RegExp("^/system$"), html`<span>🧰</span><span>System Settings</span>`, new c.SystemController(app))
   app.AddScreenController("settings", new RegExp("^/settings$"), html`<span>⌘</span><span>Settings</span>`, new c.UsersettingsController(app, usersettings.Build(CFG.BOARD_NAME, CFG.BOARD_VERSION, [])))
