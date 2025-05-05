@@ -45,6 +45,7 @@ static const char *TAG = "main";
 #include "devicemanager.hh"
 #include "webmanager_plugins/heaterexperiment_plugin.hh"
 #include "webmanager_plugins/functionblock_plugin.hh"
+#include "webmanager_plugins/sequential_functionblock_plugin.hh"
 #include "webmanager_plugins/systeminfo_plugin.hh"
 #include "webmanager_plugins/usersettings_plugin.hh"
 
@@ -87,6 +88,7 @@ extern "C" void app_main()
     std::vector<webmanager::iWebmanagerPlugin*> plugins;
     plugins.push_back(new HeaterExperimentPlugin(devicemanager));
     plugins.push_back(new FunctionblockPlugin(devicemanager));
+    plugins.push_back(new SequentialFunctionBlockPlugin(devicemanager));     //SFC Plugin 
     plugins.push_back(new SystemInfoPlugin(tempHandle));
     plugins.push_back(new UsersettingsPlugin("nvs"));
     
