@@ -5315,8 +5315,8 @@ encryptChunkSym(UA_MessageContext *const messageContext, size_t totalLength);
 
 #define UA_LOG_TRACE_CHANNEL_INTERNAL(LOGGER, CHANNEL, MSG, ...)              \
     UA_LOG_TRACE(LOGGER, UA_LOGCATEGORY_SECURECHANNEL,                        \
-                 "Connection %i | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
-                 ((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
+                 "Connection %lu | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
+                 (unsigned long)((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
                  (CHANNEL)->securityToken.channelId, __VA_ARGS__)
 
 #define UA_LOG_TRACE_CHANNEL(LOGGER, CHANNEL, ...)        \
@@ -5324,8 +5324,8 @@ encryptChunkSym(UA_MessageContext *const messageContext, size_t totalLength);
 
 #define UA_LOG_DEBUG_CHANNEL_INTERNAL(LOGGER, CHANNEL, MSG, ...)              \
     UA_LOG_DEBUG(LOGGER, UA_LOGCATEGORY_SECURECHANNEL,                        \
-                 "Connection %i | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
-                 ((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
+                 "Connection %lu | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
+                 (unsigned long)((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
                  (CHANNEL)->securityToken.channelId, __VA_ARGS__)
 
 #define UA_LOG_DEBUG_CHANNEL(LOGGER, CHANNEL, ...)        \
@@ -5333,8 +5333,8 @@ encryptChunkSym(UA_MessageContext *const messageContext, size_t totalLength);
 
 #define UA_LOG_INFO_CHANNEL_INTERNAL(LOGGER, CHANNEL, MSG, ...)               \
     UA_LOG_INFO(LOGGER, UA_LOGCATEGORY_SECURECHANNEL,                         \
-                 "Connection %i | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
-                 ((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
+                 "Connection %lu | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
+                 (unsigned long)((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
                  (CHANNEL)->securityToken.channelId, __VA_ARGS__)
 
 #define UA_LOG_INFO_CHANNEL(LOGGER, CHANNEL, ...)        \
@@ -5342,8 +5342,8 @@ encryptChunkSym(UA_MessageContext *const messageContext, size_t totalLength);
 
 #define UA_LOG_WARNING_CHANNEL_INTERNAL(LOGGER, CHANNEL, MSG, ...)            \
     UA_LOG_WARNING(LOGGER, UA_LOGCATEGORY_SECURECHANNEL,                      \
-                 "Connection %i | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
-                 ((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
+                 "Connection %lu | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
+                 (unsigned long)((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
                  (CHANNEL)->securityToken.channelId, __VA_ARGS__)
 
 #define UA_LOG_WARNING_CHANNEL(LOGGER, CHANNEL, ...)        \
@@ -5351,7 +5351,7 @@ encryptChunkSym(UA_MessageContext *const messageContext, size_t totalLength);
 
 #define UA_LOG_ERROR_CHANNEL_INTERNAL(LOGGER, CHANNEL, MSG, ...)              \
     UA_LOG_ERROR(LOGGER, UA_LOGCATEGORY_SECURECHANNEL,                        \
-                 "Connection %i | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
+                 "Connection %u | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
                  ((CHANNEL)->connection ? (int)((CHANNEL)->connection->sockfd) : 0), \
                  (CHANNEL)->securityToken.channelId, __VA_ARGS__)
 
@@ -5360,7 +5360,7 @@ encryptChunkSym(UA_MessageContext *const messageContext, size_t totalLength);
 
 #define UA_LOG_FATAL_CHANNEL_INTERNAL(LOGGER, CHANNEL, MSG, ...)              \
     UA_LOG_FATAL(LOGGER, UA_LOGCATEGORY_SECURECHANNEL,                        \
-                 "Connection %i | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
+                 "Connection %u | SecureChannel %" PRIu32 " | " MSG "%.0s",     \
                  ((CHANNEL)->connection ? (CHANNEL)->connection->sockfd : 0), \
                  (CHANNEL)->securityToken.channelId, __VA_ARGS__)
 
@@ -5795,7 +5795,7 @@ UA_Session_dequeuePublishReq(UA_Session *session);
                 (SESSION)->header.channel->securityToken.channelId : 0; \
         }                                                               \
         UA_LOG_##LEVEL(LOGGER, UA_LOGCATEGORY_SESSION,                  \
-                       "SecureChannel %i | Session %.*s | " MSG "%.0s", \
+                       "SecureChannel %lu | Session %.*s | " MSG "%.0s", \
                        channelId, (int)idString.length, idString.data, __VA_ARGS__); \
         UA_String_clear(&idString);                                     \
     } while(0)
@@ -6186,7 +6186,7 @@ UA_Server_evaluateWhereClauseContentFilter(
     if((SUB) && (SUB)->session) {                                       \
         UA_NodeId_print(&(SUB)->session->sessionId, &idString);         \
         UA_LOG_##LEVEL(LOGGER, UA_LOGCATEGORY_SESSION,                  \
-                       "SecureChannel %i | Session %.*s | Subscription %" PRIu32 " | " MSG "%.0s", \
+                       "SecureChannel %lu | Session %.*s | Subscription %" PRIu32 " | " MSG "%.0s", \
                        ((SUB)->session->header.channel ?                \
                         (SUB)->session->header.channel->securityToken.channelId : 0), \
                        (int)idString.length, idString.data, (SUB)->subscriptionId, __VA_ARGS__); \
@@ -9321,7 +9321,7 @@ static bool _rrparse(struct message *m, struct resource *rr, int count, const un
 		rr[i].clazz    = net2short(bufp);
 		rr[i].ttl      = net2long(bufp);
 		rr[i].rdlength = net2short(bufp);
-//		fprintf(stderr, "Record type %d class 0x%2x ttl %lu len %d\n", rr[i].type, rr[i].clazz, rr[i].ttl, rr[i].rdlength);
+//		fprintf(stderr, "Record type %d class 0x%2x ttl %u len %d\n", rr[i].type, rr[i].clazz, rr[i].ttl, rr[i].rdlength);
 
 		/* For the following records the rdata will be parsed later. So don't set it here:
 		 * NS, CNAME, PTR, DNAME, SOA, MX, AFSDB, RT, KX, RP, PX, SRV, NSEC
@@ -10709,7 +10709,7 @@ int mdnsd_out(mdns_daemon_t *d, struct message *m, struct in_addr *ip, unsigned 
 		return 1;
 	}
 
-//	printf("OUT: probing %X now %X pause %X publish %X\n",d->probing,d->a_now,d->a_pause,d->a_publish);
+//	printf("OUT: probing %lx now %lx pause %lx publish %lx\n",d->probing,d->a_now,d->a_pause,d->a_publish);
 
 	/* Accumulate any immediate responses */
 	if (d->a_now)
@@ -25457,7 +25457,7 @@ decodeChunkPadding(const UA_SecureChannel *channel,
     paddingSize += 1;
 
     UA_LOG_TRACE_CHANNEL(channel->securityPolicy->logger, channel,
-                         "Calculated padding size to be %lu",
+                         "Calculated padding size to be %u",
                          (long unsigned int)paddingSize);
     return (UA_UInt16)paddingSize;
 }
@@ -26959,7 +26959,7 @@ setServerShutdown(UA_Server *server) {
     if(server->config.shutdownDelay == 0)
         return true;
     UA_LOG_WARNING(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                   "Shutting down the server with a delay of %i ms", (int)server->config.shutdownDelay);
+                   "Shutting down the server with a delay of %u ms", (int)server->config.shutdownDelay);
     server->endTime = UA_DateTime_now() + (UA_DateTime)(server->config.shutdownDelay * UA_DATETIME_MSEC);
     return false;
 }
@@ -28878,7 +28878,7 @@ processHEL(UA_Server *server, UA_SecureChannel *channel, const UA_ByteString *ms
                                             (UA_TcpAcknowledgeMessage*)&helloMessage);
     if(retval != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_NETWORK,
-                    "Connection %i | Error during the HEL/ACK handshake",
+                    "Connection %u | Error during the HEL/ACK handshake",
                     (int)(channel->connection->sockfd));
         return retval;
     }
@@ -29359,7 +29359,7 @@ void
 UA_Server_processBinaryMessage(UA_Server *server, UA_Connection *connection,
                                UA_ByteString *message) {
     UA_LOG_TRACE(&server->config.logger, UA_LOGCATEGORY_NETWORK,
-                 "Connection %i | Received a packet.", (int)(connection->sockfd));
+                 "Connection %u | Received a packet.", (int)(connection->sockfd));
 
     UA_TcpErrorMessage error;
     UA_StatusCode retval = UA_STATUSCODE_GOOD;
@@ -29384,7 +29384,7 @@ UA_Server_processBinaryMessage(UA_Server *server, UA_Connection *connection,
     retval = UA_SecureChannel_processBuffer(channel, server, processSecureChannelMessage, message);
     if(retval != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(&server->config.logger, UA_LOGCATEGORY_NETWORK,
-                    "Connection %i | Processing the message failed with error %s",
+                    "Connection %u | Processing the message failed with error %s",
                     (int)(connection->sockfd), UA_StatusCode_name(retval));
         goto error;
     }
@@ -36109,7 +36109,7 @@ UA_PubSubComponent_createMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubCo
                     break;
                 default:
                     UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER, "UA_PubSubComponent_createMonitoring(): DataSetReader '%.*s' "
-                        "DataSetReader does not support timeout type '%i'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
+                        "DataSetReader does not support timeout type '%u'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
                         eMonitoringType);
                     ret = UA_STATUSCODE_BADNOTSUPPORTED;
                     break;
@@ -36118,7 +36118,7 @@ UA_PubSubComponent_createMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubCo
         }
         default:
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                "Error UA_PubSubComponent_createMonitoring(): PubSub component type '%i' is not supported", eComponentType);
+                "Error UA_PubSubComponent_createMonitoring(): PubSub component type '%u' is not supported", eComponentType);
             ret = UA_STATUSCODE_BADNOTSUPPORTED;
             break;
     }
@@ -36160,7 +36160,7 @@ UA_PubSubComponent_startMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubCom
                 }
                 default:
                     UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER, "UA_PubSubComponent_startMonitoring(): DataSetReader '%.*s' "
-                        "DataSetReader does not support timeout type '%i'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
+                        "DataSetReader does not support timeout type '%u'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
                             eMonitoringType);
                     ret = UA_STATUSCODE_BADNOTSUPPORTED;
                     break;
@@ -36169,7 +36169,7 @@ UA_PubSubComponent_startMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubCom
         }
         default:
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                "Error UA_PubSubComponent_startMonitoring(): PubSub component type '%i' is not supported", eComponentType);
+                "Error UA_PubSubComponent_startMonitoring(): PubSub component type '%u' is not supported", eComponentType);
             ret = UA_STATUSCODE_BADNOTSUPPORTED;
             break;
     }
@@ -36201,7 +36201,7 @@ UA_PubSubComponent_stopMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubComp
                 }
                 default:
                     UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER, "UA_PubSubComponent_stopMonitoring(): DataSetReader '%.*s' "
-                        "DataSetReader does not support timeout type '%i'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
+                        "DataSetReader does not support timeout type '%u'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
                         eMonitoringType);
                     ret = UA_STATUSCODE_BADNOTSUPPORTED;
                     break;
@@ -36210,7 +36210,7 @@ UA_PubSubComponent_stopMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubComp
         }
         default:
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                "Error UA_PubSubComponent_stopMonitoring(): PubSub component type '%i' is not supported", eComponentType);
+                "Error UA_PubSubComponent_stopMonitoring(): PubSub component type '%u' is not supported", eComponentType);
             ret = UA_STATUSCODE_BADNOTSUPPORTED;
             break;
     }
@@ -36248,7 +36248,7 @@ UA_PubSubComponent_updateMonitoringInterval(UA_Server *server, UA_NodeId Id, UA_
                 }
                 default:
                     UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER, "UA_PubSubComponent_createMonitoring(): DataSetReader '%.*s' "
-                        "DataSetReader does not support timeout type '%i'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
+                        "DataSetReader does not support timeout type '%u'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
                         eMonitoringType);
                     ret = UA_STATUSCODE_BADNOTSUPPORTED;
                     break;
@@ -36257,7 +36257,7 @@ UA_PubSubComponent_updateMonitoringInterval(UA_Server *server, UA_NodeId Id, UA_
         }
         default:
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                "Error UA_PubSubComponent_updateMonitoringInterval(): PubSub component type '%i' is not supported", eComponentType);
+                "Error UA_PubSubComponent_updateMonitoringInterval(): PubSub component type '%u' is not supported", eComponentType);
             ret = UA_STATUSCODE_BADNOTSUPPORTED;
             break;
     }
@@ -36285,7 +36285,7 @@ UA_PubSubComponent_deleteMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubCo
                     break;
                 default:
                     UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER, "UA_PubSubComponent_deleteMonitoring(): DataSetReader '%.*s' "
-                        "DataSetReader does not support timeout type '%i'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
+                        "DataSetReader does not support timeout type '%u'", (UA_Int32) reader->config.name.length, reader->config.name.data, 
                         eMonitoringType);
                     ret = UA_STATUSCODE_BADNOTSUPPORTED;
                     break;
@@ -36294,7 +36294,7 @@ UA_PubSubComponent_deleteMonitoring(UA_Server *server, UA_NodeId Id, UA_PubSubCo
         }
         default:
             UA_LOG_ERROR(&server->config.logger, UA_LOGCATEGORY_SERVER,
-                "Error UA_PubSubComponent_deleteMonitoring(): PubSub component type '%i' is not supported", eComponentType);
+                "Error UA_PubSubComponent_deleteMonitoring(): PubSub component type '%u' is not supported", eComponentType);
             ret = UA_STATUSCODE_BADNOTSUPPORTED;
             break;
     }
@@ -48966,7 +48966,7 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
         /* Valid SecurityMode? */
         if(endpoint->securityMode < 1 || endpoint->securityMode > 3) {
             UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                        "Rejecting endpoint %lu: invalid security mode",
+                        "Rejecting endpoint %u: invalid security mode",
                         (long unsigned)i);
             continue;
         }
@@ -48975,7 +48975,7 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
         if(client->config.securityMode > 0 &&
            client->config.securityMode != endpoint->securityMode) {
             UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                        "Rejecting endpoint %lu: security mode doesn't match",
+                        "Rejecting endpoint %u: security mode doesn't match",
                         (long unsigned)i);
             continue;
         }
@@ -48985,7 +48985,7 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
            !UA_String_equal(&client->config.securityPolicyUri,
                             &endpoint->securityPolicyUri)) {
             UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                        "Rejecting endpoint %lu: security policy doesn't match",
+                        "Rejecting endpoint %u: security policy doesn't match",
                         (long unsigned)i);
             continue;
         }
@@ -48993,7 +48993,7 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
         /* SecurityPolicy available? */
         if(!getSecurityPolicy(client, endpoint->securityPolicyUri)) {
             UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                        "Rejecting endpoint %lu: security policy not available",
+                        "Rejecting endpoint %u: security policy not available",
                         (long unsigned)i);
             continue;
         }
@@ -49010,7 +49010,7 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
                tokenPolicy->securityPolicyUri.length > 0 &&
                !getSecurityPolicy(client, tokenPolicy->securityPolicyUri)) {
                 UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                            "Rejecting UserTokenPolicy %lu in endpoint %lu: "
+                            "Rejecting UserTokenPolicy %u in endpoint %u: "
                             "security policy '%.*s' not available", (long unsigned)j, (long unsigned)i,
                             (int)tokenPolicy->securityPolicyUri.length,
                             tokenPolicy->securityPolicyUri.data);
@@ -49019,7 +49019,7 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
 
             if(tokenPolicy->tokenType > 3) {
                 UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                            "Rejecting UserTokenPolicy %lu in endpoint %lu: invalid token type",
+                            "Rejecting UserTokenPolicy %u in endpoint %u: invalid token type",
                             (long unsigned)j, (long unsigned)i);
                 continue;
             }
@@ -49028,28 +49028,28 @@ responseGetEndpoints(UA_Client *client, void *userdata, UA_UInt32 requestId,
                tokenType != &UA_TYPES[UA_TYPES_ANONYMOUSIDENTITYTOKEN] &&
                tokenType != NULL) {
                 UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                            "Rejecting UserTokenPolicy %lu (anonymous) in endpoint %lu: "
+                            "Rejecting UserTokenPolicy %u (anonymous) in endpoint %u: "
                             "configuration doesn't match", (long unsigned)j, (long unsigned)i);
                 continue;
             }
             if(tokenPolicy->tokenType == UA_USERTOKENTYPE_USERNAME &&
                tokenType != &UA_TYPES[UA_TYPES_USERNAMEIDENTITYTOKEN]) {
                 UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                            "Rejecting UserTokenPolicy %lu (username) in endpoint %lu: "
+                            "Rejecting UserTokenPolicy %u (username) in endpoint %u: "
                             "configuration doesn't match", (long unsigned)j, (long unsigned)i);
                 continue;
             }
             if(tokenPolicy->tokenType == UA_USERTOKENTYPE_CERTIFICATE &&
                tokenType != &UA_TYPES[UA_TYPES_X509IDENTITYTOKEN]) {
                 UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                            "Rejecting UserTokenPolicy %lu (certificate) in endpoint %lu: "
+                            "Rejecting UserTokenPolicy %u (certificate) in endpoint %u: "
                             "configuration doesn't match", (long unsigned)j, (long unsigned)i);
                 continue;
             }
             if(tokenPolicy->tokenType == UA_USERTOKENTYPE_ISSUEDTOKEN &&
                tokenType != &UA_TYPES[UA_TYPES_ISSUEDIDENTITYTOKEN]) {
                 UA_LOG_INFO(&client->config.logger, UA_LOGCATEGORY_CLIENT,
-                            "Rejecting UserTokenPolicy %lu (token) in endpoint %lu: "
+                            "Rejecting UserTokenPolicy %u (token) in endpoint %u: "
                             "configuration doesn't match", (long unsigned)j, (long unsigned)i);
                 continue;
             }
@@ -53041,7 +53041,7 @@ UA_PubSubManager_createWriterGroup(UA_Server *server, const UA_WriterGroupDataTy
         }
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                     "[UA_PubSubManager_createWriterGroup] Adding WriterGroup to server failed: 0x%x", statusCode);
+                     "[UA_PubSubManager_createWriterGroup] Adding WriterGroup to server failed: 0x%lx", statusCode);
     }
 
     return statusCode;
@@ -53184,7 +53184,7 @@ UA_PubSubManager_createReaderGroup(UA_Server *server, const UA_ReaderGroupDataTy
         }
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, 
-                    "[UA_PubSubManager_createReaderGroup] Adding ReaderGroup to server failed: 0x%x", statusCode);
+                    "[UA_PubSubManager_createReaderGroup] Adding ReaderGroup to server failed: 0x%lx", statusCode);
     }
     
     if(statusCode == UA_STATUSCODE_GOOD)
@@ -74713,17 +74713,17 @@ ServerNetworkLayerTCP_add(UA_ServerNetworkLayer *nl, ServerNetworkLayerTCP *laye
                           NULL, 0, NI_NUMERICHOST);
     if(res == 0) {
         UA_LOG_INFO(layer->logger, UA_LOGCATEGORY_NETWORK,
-                    "Connection %i | New connection over TCP from %s",
+                    "Connection %u | New connection over TCP from %s",
                     (int)newsockfd, remote_name);
     } else {
         UA_LOG_SOCKET_ERRNO_WRAP(UA_LOG_WARNING(layer->logger, UA_LOGCATEGORY_NETWORK,
-                                                "Connection %i | New connection over TCP, "
+                                                "Connection %u | New connection over TCP, "
                                                 "getnameinfo failed with error: %s",
                                                 (int)newsockfd, errno_str));
     }
 #else
     UA_LOG_INFO(layer->logger, UA_LOGCATEGORY_NETWORK,
-                "Connection %i | New connection over TCP",
+                "Connection %u | New connection over TCP",
                 (int)newsockfd);
 #endif
     /* Allocate and initialize the connection */
@@ -74991,7 +74991,7 @@ ServerNetworkLayerTCP_listen(UA_ServerNetworkLayer *nl, UA_Server *server,
             continue;
 
         UA_LOG_TRACE(layer->logger, UA_LOGCATEGORY_NETWORK,
-                    "Connection %i | New TCP connection on server socket %i",
+                    "Connection %u | New TCP connection on server socket %u",
                     (int)newsockfd, (int)(layer->serverSockets[i]));
 
         if(ServerNetworkLayerTCP_add(nl, layer, (UA_Int32)newsockfd, &remote) != UA_STATUSCODE_GOOD) {
@@ -75006,7 +75006,7 @@ ServerNetworkLayerTCP_listen(UA_ServerNetworkLayer *nl, UA_Server *server,
         if((e->connection.state == UA_CONNECTIONSTATE_OPENING) &&
             (now > (e->connection.openingDate + (NOHELLOTIMEOUT * UA_DATETIME_MSEC)))) {
             UA_LOG_INFO(layer->logger, UA_LOGCATEGORY_NETWORK,
-                        "Connection %i | Closed by the server (no Hello Message)",
+                        "Connection %u | Closed by the server (no Hello Message)",
                          (int)(e->connection.sockfd));
             LIST_REMOVE(e, pointers);
             layer->connectionsSize--;
@@ -75024,7 +75024,7 @@ ServerNetworkLayerTCP_listen(UA_ServerNetworkLayer *nl, UA_Server *server,
           continue;
 
         UA_LOG_TRACE(layer->logger, UA_LOGCATEGORY_NETWORK,
-                    "Connection %i | Activity on the socket",
+                    "Connection %u | Activity on the socket",
                     (int)(e->connection.sockfd));
 
         UA_ByteString buf = UA_BYTESTRING_NULL;
@@ -75037,7 +75037,7 @@ ServerNetworkLayerTCP_listen(UA_ServerNetworkLayer *nl, UA_Server *server,
         } else if(retval == UA_STATUSCODE_BADCONNECTIONCLOSED) {
             /* The socket is shutdown but not closed */
             UA_LOG_INFO(layer->logger, UA_LOGCATEGORY_NETWORK,
-                        "Connection %i | Closed",
+                        "Connection %u | Closed",
                         (int)(e->connection.sockfd));
             LIST_REMOVE(e, pointers);
             layer->connectionsSize--;

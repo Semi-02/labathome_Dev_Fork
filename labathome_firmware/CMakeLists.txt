@@ -4,6 +4,7 @@ set(PROJECT_VER "0.0.0.4")
 set(GENERATED_DIR "C:/repos/generated/")
 set(USERPROFILE $ENV{USERPROFILE})
 set(EXTRA_COMPONENT_DIRS "../../espidf-components" "../../espidf-component-webmanager" "../../espidf-components-lcd" "components/open62541")
+add_compile_options(-Wno-format)
 
 file(READ "${GENERATED_DIR}/cmake/config.json" config_json)
 #string(JSON SENSACT_NODE_NAME GET "${config_json}" SENSACT_NODE_NAME)

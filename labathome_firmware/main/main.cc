@@ -12,6 +12,9 @@
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
 
+//opc ua include
+#include <open62541.h> // Include für die kompilierten Header
+
 //esp idf includes
 #include <esp_system.h>
 #include <esp_log.h>
@@ -57,6 +60,46 @@ constexpr const char* NVS_PARTITION_NAME{NVS_DEFAULT_PART_NAME};
 FLASH_FILE(esp32_pem_crt);
 FLASH_FILE(esp32_pem_key);
 
+// Funktion für den OPC UA-Server
+void StartOPCUAServer() {
+    UA_Server *server = UA_Server_new();
+    UA_ServerConfig *config = UA_Server_getConfig(server);
+    UA_ServerConfig_setDefault(config);
+
+    // Debug-Logs aktivieren
+    config->logger = *UA_Log_Stdout;
+    //config->logLevel = UA_LOGLEVEL_TRACE;
+
+    // Hostname explizit setzen
+    config->customHostname = UA_STRING_ALLOC("opc.tcp://192.168.4.1:4840");
+
+    // Eine Variable (Node) hinzufügen
+    UA_VariableAttributes attr = UA_VariableAttributes_default;
+    UA_Double myValue = 42.0; // Beispielwert
+    UA_Variant_setScalar(&attr.value, &myValue, &UA_TYPES[UA_TYPES_DOUBLE]);
+    attr.description = UA_LOCALIZEDTEXT((char*)"en-US", (char*)"ist in 78 Stunden.");
+    attr.displayName = UA_LOCALIZEDTEXT((char*)"en-US", (char*)"Schützenfest");
+    attr.dataType = UA_TYPES[UA_TYPES_DOUBLE].typeId;
+    attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+
+    UA_NodeId myNodeId = UA_NODEID_STRING(1, (char*)"schuetzenfest");
+    UA_QualifiedName myName = UA_QUALIFIEDNAME(1, (char*)"schuetzenfest");
+    UA_NodeId parentNodeId = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
+    UA_Server_addVariableNode(server, myNodeId, parentNodeId,
+                              UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
+                              myName, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
+                              attr, nullptr, nullptr);
+
+    // Server starten
+    ESP_LOGI("OPCUA", "Starting OPC UA Server...");
+    UA_Boolean running = true;
+    UA_StatusCode retval = UA_Server_run(server, &running);
+    if (retval != UA_STATUSCODE_GOOD) {
+        ESP_LOGE("OPCUA", "Failed to start OPC UA Server: %s", UA_StatusCode_name(retval));
+    }
+
+    UA_Server_delete(server);
+}
 
 extern "C" void app_main()
 {
@@ -145,6 +188,8 @@ extern "C" void app_main()
 
     wm->CallMeAfterInitializationToMarkCurrentPartitionAsValid();
 
+    // Start OPC UA Server
+    StartOPCUAServer();
 
     // Start eternal supervisor loop
     TickType_t xLastWakeTime = xTaskGetTickCount();
