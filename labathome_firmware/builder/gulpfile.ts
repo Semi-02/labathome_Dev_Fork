@@ -29,13 +29,13 @@ export const DEFAULT_BOARD_VERSION=150200
 
 //Paths
 export const IDF_PATH=globalThis.process.env.IDF_PATH as string;
-export const USERPROFILE =globalThis.process.env.USERPROFILE as string;
+export const USERPROFILE =globalThis.process.env.HOME as string;
 
 //Config
 const FLASH_ENCYRPTION_STRENGTH=idf.EncryptionStrength.AES256
-const IDF_PROJECT_ROOT = "C:\\repos\\labathome\\labathome_firmware";
-const IDF_COMPONENT_WEBMANAGER_ROOT = "C:/repos/espidf-component-webmanager";
-const GENERATED_ROOT = "c:\\repos\\generated";
+const IDF_PROJECT_ROOT = "/Users/daniel/repos/labathome/labathome_firmware";
+const IDF_COMPONENT_WEBMANAGER_ROOT = "/Users/daniel/repos/espidf-component-webmanager";
+const GENERATED_ROOT = "/Users/daniel/repos/generated";
 
 const BOARDS_BASE_DIR= path.join(USERPROFILE, "netcase/esp32_boards");
 const CERTIFICATES = path.join(USERPROFILE, "netcase/certificates");
@@ -88,6 +88,8 @@ export async function addOrUpdateConnectedBoard(cb: gulp.TaskFunctionCallback){
 async function buildAndEncryptFirmware(cb: gulp.TaskFunctionCallback) {
   var c=await Context.get(contextConfig)
   await idf.buildFirmware(c);
+  console.log("➡️ Build abgeschlossen. Existiert flasher_args.json?");
+  console.log("➡️", fs.existsSync(path.join(c.p.P_BUILD, "flasher_args.json")));
   //we need to update context, as the the build produces new files...
   c=await Context.get(contextConfig);
   return idf.encryptPartitions_Bootloader_App_PartitionTable_OtaData(c);

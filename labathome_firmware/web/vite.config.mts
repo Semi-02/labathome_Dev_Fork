@@ -19,8 +19,8 @@ export default defineConfig(({ command, mode, isSsrBuild, isPreview }) => {
       open: "https://protzklotz:5173",
       cors:true,
       https: {
-        key: fs.readFileSync(process.env.USERPROFILE+"/netcase/certificates/testserver.pem.key"),
-        cert: fs.readFileSync(process.env.USERPROFILE+"/netcase/certificates/testserver.pem.crt"),
+        key: fs.readFileSync(process.env.HOME+"/netcase/certificates/testserver.pem.key"),
+        cert: fs.readFileSync(process.env.HOME+"/netcase/certificates/testserver.pem.crt"),
 
       },
 

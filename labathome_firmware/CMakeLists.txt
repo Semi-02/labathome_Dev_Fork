@@ -1,11 +1,22 @@
 cmake_minimum_required(VERSION 3.30)
 set(PROJECT_VER "0.0.0.4")
 
-set(GENERATED_DIR "C:/repos/generated/")
-set(USERPROFILE $ENV{USERPROFILE})
+if(WIN32)
+  set(GENERATED_DIR "C:/repos/generated/")
+  set(USERPROFILE $ENV{USERPROFILE})
+else()
+  set(GENERATED_DIR "$ENV{HOME}/repos/generated/")
+  set(USERPROFILE $ENV{HOME})
+endif()
+
 set(EXTRA_COMPONENT_DIRS "../../espidf-components" "../../espidf-component-webmanager" "../../espidf-components-lcd")
 
 file(READ "${GENERATED_DIR}/cmake/config.json" config_json)
+message(STATUS "JSON loaded from: ${GENERATED_DIR}/cmake/config.json")
+message(STATUS "BOARD_NAME: ${BOARD_NAME}")
+message(STATUS "APP_NAME: ${APP_NAME}")
+message(STATUS "BOARD_MAC: ${BOARD_MAC}")
+
 #string(JSON SENSACT_NODE_NAME GET "${config_json}" SENSACT_NODE_NAME)
 #string(JSON SENSACT_MODEL_NAME GET "${config_json}" SENSACT_MODEL_NAME)
 #string(JSON SENSACT_MODEL_CREATED_DT GET "${config_json}" SENSACT_MODEL_CREATED_DT)
