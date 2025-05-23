@@ -5,6 +5,7 @@
 #include "../generated/flatbuffers_cpp/ns03functionblock_generated.h"
 #include "cJSON.h"
 #include "esp_err.h"
+#include "sequentialfunctionblocks.hh"
 #define TAG "SFC_PLUGIN"
 
 // Define a namespace value for SFC messages - must match client-side value
@@ -16,41 +17,12 @@ class SequentialFunctionBlockPlugin : public webmanager::iWebmanagerPlugin
 {
 private:
     DeviceManager *devicemanager;
-
-    esp_err_t ProcessSfcData(const char* jsonData, flatbuffers::FlatBufferBuilder& responseBuilder) {
-        // Parse the JSON data
-        cJSON *json = cJSON_Parse(jsonData);
-        if (json == NULL) {
-            responseBuilder.Clear();
-            return ESP_ERR_INVALID_ARG; 
-        }
-        
-        // Validate the SFC structure
-        cJSON *startNode = cJSON_GetObjectItem(json, "start");
-        cJSON *steps = cJSON_GetObjectItem(json, "steps");
-        cJSON *booleans = cJSON_GetObjectItem(json, "booleans");
-        
-        if (!startNode || !steps || !booleans) {
-            // Create error response for invalid structure
-            responseBuilder.Clear();
-            cJSON_Delete(json);
-            return ESP_ERR_INVALID_ARG;
-        }
-        
-        // Process the SFC data
-        int stepCount = cJSON_GetArraySize(steps);
-        ESP_LOGI(TAG, "SFC structure with %d steps received", stepCount);
-        
-
-        // devicemanager->ProcessSfcData(json);
-        
-        responseBuilder.Clear();
-        cJSON_Delete(json);
-        return ESP_OK;
-    }
+    SequentialFunctionBlocks *sfc;
 
 public:
-    SequentialFunctionBlockPlugin(DeviceManager *devicemanager) : devicemanager(devicemanager) {}
+    SequentialFunctionBlockPlugin(DeviceManager *devicemanager) : devicemanager(devicemanager) {
+        this->sfc = new SequentialFunctionBlocks(devicemanager);
+    }
 
     void OnBegin(webmanager::iWebmanagerCallback *callback) override {
         ESP_LOGI(TAG, "Sequential Function Block Plugin initialized");
@@ -70,8 +42,8 @@ public:
         case functionblock::Requests::Requests_RequestSFCRun: {
             ESP_LOGI(TAG, "Got Requests_RequestSFCRun");
             const auto *request = rw->request_as_RequestSFCRun();
-            const char *sfcData = request->sfc_data()->c_str();
-            ESP_LOGI(TAG, "SFC Data: %s", sfcData);
+            //const char *sfcData = request->sfc_data()->c_str();
+   
     
             // Verarbeiten Sie die SFC-Daten hier
             flatbuffers::FlatBufferBuilder b(256);
@@ -83,7 +55,9 @@ public:
                 )
             );
             callback->WrapAndSendAsync(SFC_NAMESPACE_VALUE, b);
+
             ESP_LOGI(TAG, "SFC Data process");
+            sfc->LoadSfcFromFile(TEMPSFC_FILEPATH);
             return webmanager::eMessageReceiverResult::OK;
         }
         default:

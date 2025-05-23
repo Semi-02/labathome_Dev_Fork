@@ -18,8 +18,9 @@
 constexpr const char *FBDSTORE_BASE_DIRECTORY = "/spiffs/fbdstore/";    
 constexpr const char *DEFAULTFBD_FBD_FILEPATH =  "/spiffs/defaultfbd.fbd";
 constexpr const char *TEMPFBD_FBD_FILEPATH = "/spiffs/tempfbd.fbd";
-constexpr const char *TEMPSFC_FILEPATH = "/spiffs/tempsfc.fbd"; //SFC = Sequential Function Chart
-
+//SFC = Sequential Function Chart
+constexpr const char *TEMPSFC_FILEPATH = "/spiffs/tempsfc.fbd"; 
+constexpr const char *DEFAULTSFC_FILEPATH = "/spiffs/defaultsfc.fbd"; 
 class FunctionBlock;
 class Executable
 {
