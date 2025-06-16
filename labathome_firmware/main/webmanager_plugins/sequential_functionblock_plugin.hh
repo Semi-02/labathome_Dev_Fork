@@ -5,7 +5,7 @@
 #include "../generated/flatbuffers_cpp/ns03functionblock_generated.h"
 #include "cJSON.h"
 #include "esp_err.h"
-#include "sequentialfunctionblocks.hh"
+#include "../sfc/sequentialfunctionblocks.hh"
 #define TAG "SFC_PLUGIN"
 
 // Define a namespace value for SFC messages - must match client-side value
@@ -41,11 +41,11 @@ public:
         switch (reqType) {
         case functionblock::Requests::Requests_RequestSFCRun: {
             ESP_LOGI(TAG, "Got Requests_RequestSFCRun");
-            const auto *request = rw->request_as_RequestSFCRun();
+            //const auto *request = rw->request_as_RequestSFCRun();
+            //hier können daten aus der Flatbuffer Anfrage extrahiert werden
             //const char *sfcData = request->sfc_data()->c_str();
    
-    
-            // Verarbeiten Sie die SFC-Daten hier
+
             flatbuffers::FlatBufferBuilder b(256);
             b.Finish(
                 functionblock::CreateResponseWrapper(
@@ -58,6 +58,7 @@ public:
 
             ESP_LOGI(TAG, "SFC Data process");
             sfc->LoadSfcFromFile(TEMPSFC_FILEPATH);
+
             return webmanager::eMessageReceiverResult::OK;
         }
         default:

@@ -19,8 +19,9 @@ constexpr const char *FBDSTORE_BASE_DIRECTORY = "/spiffs/fbdstore/";
 constexpr const char *DEFAULTFBD_FBD_FILEPATH =  "/spiffs/defaultfbd.fbd";
 constexpr const char *TEMPFBD_FBD_FILEPATH = "/spiffs/tempfbd.fbd";
 //SFC = Sequential Function Chart
-constexpr const char *TEMPSFC_FILEPATH = "/spiffs/tempsfc.fbd"; 
-constexpr const char *DEFAULTSFC_FILEPATH = "/spiffs/defaultsfc.fbd"; 
+constexpr const char *SFCSTORE_BASE_DIRECTORY = "/spiffs/sfcstore/";  
+constexpr const char *DEFAULTSFC_FILEPATH = "/spiffs/defaultsfc.json"; 
+constexpr const char *TEMPSFC_FILEPATH = "/spiffs/tempsfc.json"; 
 class FunctionBlock;
 class Executable
 {

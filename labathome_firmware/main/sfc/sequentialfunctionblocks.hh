@@ -9,6 +9,11 @@
 #include "common-esp32.hh"
 #include "cJSON.h"
 #include "esp_vfs.h"
+#include "sfc/sfc_components.hh"
+#include "sfc/sfc_engine.hh"
+#include "sfc/sfc_parser.hh"
+#include "sfc/sfc_context.hh"
+#include <memory>
 
 #define TAG "SFC"
 
@@ -17,12 +22,24 @@ private:
     DeviceManager* deviceManager;
     cJSON* currentSfcData;
     bool isInitialized;
+    
+    // SFC components
+    std::shared_ptr<sfc::SfcChart> chart;
+    std::shared_ptr<sfc::SfcEngine> engine;
+    std::shared_ptr<sfc::DeviceManagerContext> context;
+    sfc::SfcParser parser;
 
 public:
     SequentialFunctionBlocks(DeviceManager* deviceManager) : 
         deviceManager(deviceManager), 
         currentSfcData(nullptr),
-        isInitialized(false) {}
+        isInitialized(false) {
+        
+        // Create SFC engine and context
+        engine = std::make_shared<sfc::SfcEngine>();
+        context = std::make_shared<sfc::DeviceManagerContext>(deviceManager);
+        
+    }
 
     ~SequentialFunctionBlocks() {
         if (currentSfcData) {
@@ -31,9 +48,9 @@ public:
     }
 
     /**
-     * @brief Lädt und parst eine SFC-JSON-Datei, die vom Client hochgeladen wurde
-     * @param path Pfad zur SFC-JSON-Datei
-     * @return ErrorCode mit dem Status der Operation
+     * @brief Loads and parses an SFC JSON file uploaded by the client
+     * @param path Path to the SFC JSON file
+     * @return ErrorCode with the operation status
      */
     ErrorCode LoadSfcFromFile(const char* path) {
         FILE *fd = NULL;
@@ -52,7 +69,7 @@ public:
         
         ESP_LOGI(TAG, "Opening SFC file %s was successful. File Size is %ld bytes", path, file_stat.st_size);
         
-        // Allokiere Speicher für den JSON-String
+        // Allocate memory for JSON string
         char* jsonBuffer = (char*)malloc(file_stat.st_size + 1);
         if (!jsonBuffer) {
             ESP_LOGE(TAG, "Memory allocation failed for JSON buffer");
@@ -60,7 +77,7 @@ public:
             return ErrorCode::FILE_SYSTEM_ERROR;
         }
         
-        // Lese die Datei komplett ein
+        // Read the entire file
         size_t bytesRead = fread(jsonBuffer, 1, file_stat.st_size, fd);
         fclose(fd);
         
@@ -70,7 +87,7 @@ public:
             return ErrorCode::FILE_SYSTEM_ERROR;
         }
         
-        // Stelle sicher, dass der String null-terminiert ist
+        // Ensure string is null-terminated
         jsonBuffer[bytesRead] = '\0';
         
         // Parse JSON
@@ -82,25 +99,57 @@ public:
             return ErrorCode::FILE_SYSTEM_ERROR;
         }
         
-        // Lösche alte Daten, falls vorhanden
+        // Delete old data if present
         if (currentSfcData) {
             cJSON_Delete(currentSfcData);
         }
         
-        // Speichere die neuen Daten
+        // Store the new data
         currentSfcData = newSfcData;
-   
+        
+        // Create SFC chart from JSON
+        std::shared_ptr<sfc::SfcChart> newChart;
+        ErrorCode parseResult = parser.ParseFromJsonObject(currentSfcData, newChart);
+        if (parseResult != ErrorCode::OK) {
+            ESP_LOGE(TAG, "Failed to parse SFC chart from JSON");
+            return parseResult;
+        }
+        
+        // Store the chart and initialize the engine
+        chart = newChart;
+        engine->SetChart(chart);
+        engine->SetContext(context);
+        ErrorCode initResult = engine->Initialize();
+        if (initResult != ErrorCode::OK) {
+            ESP_LOGE(TAG, "Failed to initialize SFC engine");
+            return initResult;
+        }
+        
         isInitialized = true;
         ESP_LOGI(TAG, "SFC data successfully loaded and parsed");
         
-        // Gib den Inhalt in der Konsole aus (erster Level)
+        // Log the content (first level)
         LogSfcData();
         
         return ErrorCode::OK;
     }
     
     /**
-     * @brief Gibt die Struktur des geladenen SFC in der Konsole aus
+     * @brief Execute one cycle of the SFC program
+     * @return ErrorCode with the operation status
+     */
+    ErrorCode ExecuteCycle() {
+        if (!isInitialized) {
+            ESP_LOGW(TAG, "SFC not initialized, cannot execute cycle");
+            return ErrorCode::NOT_YET_INITIALIZED;
+        }
+        
+        return engine->ExecuteCycle();
+    }
+    
+    
+    /**
+     * @brief Log the structure of the loaded SFC in the console
      */
     void LogSfcData() {
         if (!currentSfcData) {
@@ -114,5 +163,23 @@ public:
             free(jsonStr);
         }
     }
-
+    
+    /**
+     * @brief Check if SFC is initialized
+     */
+    bool IsInitialized() const {
+        return isInitialized;
+    }
+    
+    /**
+     * @brief Reset the SFC engine
+     */
+    void Reset() {
+        if (engine) {
+            engine->Reset();
+            isInitialized = false;
+        }
+    }
 };
+
+#undef TAG
