@@ -5,7 +5,7 @@
 #include "../generated/flatbuffers_cpp/ns03functionblock_generated.h"
 #include "cJSON.h"
 #include "esp_err.h"
-#include "../sfc/sequentialfunctionblocks.hh"
+#include "../sfc/sequentialfunctionblock.hh"  // Fix: changed from sequentialfunctionblocks.hh
 #define TAG "SFC_PLUGIN"
 
 // Define a namespace value for SFC messages - must match client-side value
@@ -17,11 +17,17 @@ class SequentialFunctionBlockPlugin : public webmanager::iWebmanagerPlugin
 {
 private:
     DeviceManager *devicemanager;
-    SequentialFunctionBlocks *sfc;
+    SequentialFunctionBlocks *sfc;  // This class needs to be defined in sequentialfunctionblock.hh
 
 public:
     SequentialFunctionBlockPlugin(DeviceManager *devicemanager) : devicemanager(devicemanager) {
         this->sfc = new SequentialFunctionBlocks(devicemanager);
+    }
+    ~SequentialFunctionBlockPlugin() {
+        if (sfc) {
+            delete sfc;
+            sfc = nullptr;
+        }
     }
 
     void OnBegin(webmanager::iWebmanagerCallback *callback) override {
