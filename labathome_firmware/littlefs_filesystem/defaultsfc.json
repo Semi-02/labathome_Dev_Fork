@@ -3,13 +3,28 @@
   "steps": [
     {
       "uid": "step1",
-      "caption": "Rot Phase",
-      "actions": [],
+      "caption": "Test_Green_On",
+      "actions": [
+        {
+          "codeUid": "act1_1",
+          "caption": "Grün einschalten",
+          "targetBoolean": "Green_LED",
+          "qualifier": "S0",
+          "ms_time": 0
+        },
+        {
+          "codeUid": "act1_2",
+          "caption": "Timer setzen (true nach 2s)",
+          "targetBoolean": "timerBool",
+          "qualifier": "S0",
+          "ms_time": 2000
+        }
+      ],
       "outgoingTransitions": [
         {
           "type": "simple",
           "condition": [
-            "redTimer == true"
+            "timerBool == true"
           ],
           "sourceDone": [
             true
@@ -25,138 +40,34 @@
     },
     {
       "uid": "step2",
-      "caption": "Rot-Gelb Phase",
+      "caption": "Test_Green_Off",
       "actions": [
         {
           "codeUid": "act2_1",
-          "caption": "Rot einschalten",
-          "targetBoolean": "redLight",
-          "qualifier": "S0"
+          "caption": "Grün ausschalten",
+          "targetBoolean": "Green_LED",
+          "qualifier": "N",
+          "ms_time": 0
         },
         {
           "codeUid": "act2_2",
-          "caption": "Gelb einschalten",
-          "targetBoolean": "yellowLight",
-          "qualifier": "S0"
-        },
-        {
-          "codeUid": "act2_3",
-          "caption": "Grün ausschalten",
-          "targetBoolean": "greenLight",
-          "qualifier": "N"
-        },
-        {
-          "codeUid": "act2_4",
-          "caption": "Timer starten",
-          "targetBoolean": "redYellowTimer",
-          "qualifier": "SD"
+          "caption": "Timer zurücksetzen (false)",
+          "targetBoolean": "timerBool",
+          "qualifier": "N",
+          "ms_time": 0
         }
       ],
       "outgoingTransitions": [
         {
           "type": "simple",
           "condition": [
-            "redYellowTimer == true"
+            "timerBool == false"
           ],
           "sourceDone": [
             true
           ],
           "source": [
             "step2"
-          ],
-          "target": [
-            "step3"
-          ]
-        }
-      ]
-    },
-    {
-      "uid": "step3",
-      "caption": "Grün Phase",
-      "actions": [
-        {
-          "codeUid": "act3_1",
-          "caption": "Rot ausschalten",
-          "targetBoolean": "redLight",
-          "qualifier": "N"
-        },
-        {
-          "codeUid": "act3_2",
-          "caption": "Gelb ausschalten",
-          "targetBoolean": "yellowLight",
-          "qualifier": "N"
-        },
-        {
-          "codeUid": "act3_3",
-          "caption": "Grün einschalten",
-          "targetBoolean": "greenLight",
-          "qualifier": "S0"
-        },
-        {
-          "codeUid": "act3_4",
-          "caption": "Timer starten",
-          "targetBoolean": "greenTimer",
-          "qualifier": "SD"
-        }
-      ],
-      "outgoingTransitions": [
-        {
-          "type": "simple",
-          "condition": [
-            "greenTimer == true"
-          ],
-          "sourceDone": [
-            true
-          ],
-          "source": [
-            "step3"
-          ],
-          "target": [
-            "step4"
-          ]
-        }
-      ]
-    },
-    {
-      "uid": "step4",
-      "caption": "Gelb Phase",
-      "actions": [
-        {
-          "codeUid": "act4_1",
-          "caption": "Rot ausschalten",
-          "targetBoolean": "redLight",
-          "qualifier": "N"
-        },
-        {
-          "codeUid": "act4_2",
-          "caption": "Gelb einschalten",
-          "targetBoolean": "yellowLight",
-          "qualifier": "S0"
-        },
-        {
-          "codeUid": "act4_3",
-          "caption": "Grün ausschalten",
-          "targetBoolean": "greenLight",
-          "qualifier": "N"
-        },
-        {
-          "codeUid": "act4_4",
-          "caption": "Timer starten",
-          "targetBoolean": "yellowTimer",
-          "qualifier": "SD"
-        }
-      ],
-      "outgoingTransitions": [
-        {
-          "type": "simple",
-          "condition": [
-            "yellowTimer == true"
-          ],
-          "sourceDone": [
-            true
-          ],
-          "source": [
-            "step4"
           ],
           "target": [
             "step1"
@@ -166,12 +77,13 @@
     }
   ],
   "booleans": {
-    "redLed": false,
-    "yellowLed": false,
-    "greenLed": false,
-    "merk1": false,
-    "merk2": false,
-    "merk3": false,
-    "merk4": false
+    "hardware": {
+      "Red_LED": false,
+      "Yellow_LED": false,
+      "Green_LED": false
+    },
+    "custom": {
+      "timerBool": false
+    }
   }
 }
