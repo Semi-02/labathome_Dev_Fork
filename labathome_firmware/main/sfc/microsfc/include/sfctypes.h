@@ -75,7 +75,7 @@ typedef struct {
 	bool active :1;
 	bool transiting :1;
 } stateful_state_t;
-typedef void (*state_handler_fnc)(const stateful_state_t & state);
+typedef std::function<void(const stateful_state_t &)> state_handler_fnc;
 
 typedef struct {
 	char state;

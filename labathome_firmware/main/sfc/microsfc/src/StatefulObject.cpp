@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "StatefulObject.h"
+#include "esp_log.h"
+#define SFC_TAG "SFC"
 
 namespace sfc {
 
@@ -90,12 +92,14 @@ void StatefulObject::onTick(const sfc::time_t &delta) {
 
 void StatefulObject::activate() {
 	if (!(this->state.activated)) {
+		ESP_LOGI(SFC_TAG, "SFC Step Statefull active");
 		this->state.activated = true;
 		this->state.active_time = 0;
 	}
 }
 
 void StatefulObject::shutdown() {
+	ESP_LOGI(SFC_TAG, "SFC Step Statefull shutdown");
 	this->state.activated = false;
 }
 

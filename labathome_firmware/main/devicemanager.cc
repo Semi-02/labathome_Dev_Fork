@@ -9,6 +9,7 @@
 #include "../generated/flatbuffers_cpp/ns03functionblock_generated.h"
 #include "../generated/flatbuffers_cpp/ns04heaterexperiment_generated.h"
 #include "esp_vfs.h"
+#include "sfc/sequentialfunctionblock.hh"
 
 constexpr uint32_t TRIGGER_FALLBACK_TIME_MS{10000};
 constexpr size_t FILE_PATH_MAX =ESP_VFS_PATH_MAX + CONFIG_SPIFFS_OBJ_NAME_LEN;
@@ -26,6 +27,7 @@ DeviceManager::DeviceManager(iHAL *hal):hal(hal)
     currentExecutable = this->createDummyInitialExecutableAndEnqueue();
     nextExecutable = nullptr;
     heaterPIDController = new PID::Controller<float>(&actualTemperature, &setpointHeater, &setpointTemperature, 0, 100, PID::Mode::OFF, PID::AntiWindup::ON_LIMIT_INTEGRATOR, PID::Direction::DIRECT, 1000);
+    
 }
 
 ErrorCode DeviceManager::InitAndRun()
@@ -33,6 +35,24 @@ ErrorCode DeviceManager::InitAndRun()
     xTaskCreate([](void* p){((DeviceManager*)p)->EternalLoop();}, "plcTask", 4096 * 4, this, 6, NULL);
     return ErrorCode::OK;
 }
+
+//SFC
+bool DeviceManager::IsSfcLoaded() const { 
+    return sfc && sfc->IsInitialized(); 
+}
+
+void DeviceManager::TickSfc(uint32_t ms) {  
+    if (IsSfcLoaded()) {
+        sfc->Tick(ms);
+    }
+}
+
+ErrorCode DeviceManager::LoadSfcFromFile(const char *path) {
+    if (!sfc)
+        sfc = new SequentialFunctionBlocks(this);
+    return sfc->LoadSfcFromFile(path);
+}
+//SFC Ende
 
 bool DeviceManager::IsBinaryAvailable(size_t index)
 {
@@ -493,9 +513,11 @@ ErrorCode DeviceManager::CheckForNewExecutable()
 
 ErrorCode DeviceManager::Loop()
 {
-    static ExperimentMode previousExperimentMode = ExperimentMode::functionblock; //set in last line of this method
+    static ExperimentMode previousExperimentMode = ExperimentMode::sequential_functionblock; //set in last line of this method
     uint32_t nowMsSteady = hal->GetMillis();
-    if(experimentMode != ExperimentMode::functionblock && nowMsSteady-this->lastExperimentTrigger>TRIGGER_FALLBACK_TIME_MS)
+    experimentMode = ExperimentMode::sequential_functionblock; //default mode
+
+    if(experimentMode != ExperimentMode::sequential_functionblock && nowMsSteady-this->lastExperimentTrigger>TRIGGER_FALLBACK_TIME_MS)
     {
         //auto fallback
         experimentMode = ExperimentMode::functionblock;
@@ -519,6 +541,24 @@ ErrorCode DeviceManager::Loop()
         for (const auto &i : this->currentExecutable->functionBlocks)
         {
             i->execute(this);
+        }
+    }
+    else if (experimentMode == ExperimentMode::sequential_functionblock)
+    {
+        uint32_t ms_delta = 1;
+        if (lastSfcTickMs != 0)
+        {
+            ms_delta = nowMsSteady - lastSfcTickMs;
+            if (ms_delta == 0)
+                ms_delta = 1;
+        }
+        lastSfcTickMs = nowMsSteady;
+        if (IsSfcLoaded())
+        {
+            TickSfc(ms_delta); // oder die gewünschte ms-Rate
+        }else
+        {
+            LoadSfcFromFile(DEFAULTSFC_FILEPATH);
         }
     }
     else if(experimentMode==ExperimentMode::openloop_heater){

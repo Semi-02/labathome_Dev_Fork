@@ -1,415 +1,585 @@
-// #define SFC_TAG "SFC_ADAPTER"
+#define SFC_TAG "SFC_ADAPTER"
 
-// #include "sfc_adapter.hh"
-// #include "crgb.hh"
-// #include "esp_log.h"
-// #include <string.h>
-// #include "microsfc/include/Application.h"
-// #include "microsfc/include/Step.h"
-// #include "microsfc/include/Action.h"
-// #include "microsfc/include/Transition.h"
-// #include "microsfc/include/sfctypes.h"
-// #include "microsfc/include/StatefulObject.h"
-// #include "microsfc/include/EventListener.h"
-// #include "microsfc/include/StepContext.h"
-// #include "microsfc/include/Timer.h"
-// #include "microsfc/include/NonStoredAction.h"
-// #include "microsfc/include/StoredAction.h"
+#include "sfc_adapter.hh"
+#include "crgb.hh"
+#include "esp_log.h"
+#include <string.h>
+#include <sstream>
+#include <map>
+#include "microsfc/include/Application.h"
+#include "microsfc/include/Step.h"
+#include "microsfc/include/Action.h"
+#include "microsfc/include/Transition.h"
+#include "microsfc/include/sfctypes.h"
+#include "microsfc/include/StatefulObject.h"
+#include "microsfc/include/EventListener.h"
+#include "microsfc/include/StepContext.h"
+#include "microsfc/include/Timer.h"
+#include "microsfc/include/NonStoredAction.h"
+#include "microsfc/include/StoredAction.h"
 
-// SfcAdapter::SfcAdapter(DeviceManager* deviceManager) : 
-//     deviceManager(deviceManager),
-//     hasLedMapping(false) {
-//     application = nullptr;
-//     redLightVar = "";
-//     yellowLightVar = "";
-//     greenLightVar = "";
-// }
+//Qualifier:
+// N  Non-stored               The action is active as long as the step.
+// R  overriding Reset         The action is deactivated.
+// S  Set (Stored)             executes this action as soon as the step is active. The action execution is continued even when the step has been deactivated until it gets a reset.
+// L  time Limited             executes this action as soon as the step is active. The action is executed until the step is deactivated or the given time span has elapsed.
+// D  time Delayed             starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until the step is deactivated.
+// P  Pulse                    executes the action exactly two times: one time when the step is activated and one time when the step is deactivated.
+// SD Stored and time Delayed  starts executing the action only after the given delay time has elapsed following step activation. The action is executed until it gets a reset.
+// DS Delayed and Stored       starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until it gets a reset.
+// SL Stored and time limited  executes this action as soon as the step is activated. It is executed until the specified time has elapsed or it gets a reset.</p></td></tr>
 
-// SfcAdapter::~SfcAdapter() {
-//     if (application) {
-//         delete application;
-//     }
-//     for (auto action : actions) {
-//         delete action;
-//     }
-// }
+SfcAdapter::SfcAdapter(DeviceManager* deviceManager)
+    : deviceManager(deviceManager),
+      hasLedMapping(false) {
+    application = nullptr;
+    redLightVar = "Red_LED";
+    yellowLightVar = "Yellow_LED";
+    greenLightVar = "Green_LED";
+}
 
-// ErrorCode SfcAdapter::LoadFromFile(const char* path) {
-//     Reset();
+SfcAdapter::~SfcAdapter() {
+    if (application) {
+        delete application;
+    }
+    for (auto action : actions) {
+        delete action;
+    }
+}
 
-//     FILE* file = fopen(path, "r");
-//     if (!file) {
-//         ESP_LOGE(SFC_TAG, "Failed to open SFC file: %s", path);
-//         return ErrorCode::FILE_SYSTEM_ERROR;
-//     }
+ErrorCode SfcAdapter::LoadFromFile(const char* path) {
+    Reset();
 
-//     fseek(file, 0, SEEK_END);
-//     long size = ftell(file);
-//     fseek(file, 0, SEEK_SET);
+    FILE* file = fopen(path, "r");
+    if (!file) {
+        ESP_LOGE(SFC_TAG, "Failed to open SFC file: %s", path);
+        return ErrorCode::FILE_SYSTEM_ERROR;
+    }
 
-//     char* buffer = (char*)malloc(size + 1);
-//     if (!buffer) {
-//         fclose(file);
-//         return ErrorCode::FILE_SYSTEM_ERROR;
-//     }
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
-//     size_t bytesRead = fread(buffer, 1, size, file);
-//     fclose(file);
-//     buffer[bytesRead] = '\0';
+    char* buffer = (char*)malloc(size + 1);
+    if (!buffer) {
+        fclose(file);
+        return ErrorCode::FILE_SYSTEM_ERROR;
+    }
 
-//     cJSON* root = cJSON_Parse(buffer);
-//     free(buffer);
+    size_t bytesRead = fread(buffer, 1, size, file);
+    fclose(file);
+    buffer[bytesRead] = '\0';
 
-//     if (!root) {
-//         ESP_LOGE(SFC_TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
-//         return ErrorCode::INVALID_NEW_FBD;
-//     }
+    cJSON* root = cJSON_Parse(buffer);
+    free(buffer);
 
-//     ErrorCode result = ParseJson(root);
-//     cJSON_Delete(root);
+    if (!root) {
+        ESP_LOGE(SFC_TAG, "Failed to parse JSON: %s", cJSON_GetErrorPtr());
+        return ErrorCode::INVALID_NEW_FBD;
+    }
 
-//     if (result != ErrorCode::OK) {
-//         return result;
-//     }
+    ErrorCode result = ParseJson(root);
+    cJSON_Delete(root);
 
-//     // Create application with the correct context type
-//     application = new sfc::Application(context);
-//     application->activate();
+    if (result != ErrorCode::OK) {
+        return result;
+    }
 
-//     ESP_LOGI(SFC_TAG, "SFC loaded successfully");
-//     return ErrorCode::OK;
-// }
+    // Set up context arrays using the vectors we've populated
+    context.steps = { steps.data(), steps.size() };
+    context.actions = { actions.data(), actions.size() };
+    context.transitions = { transitions.data(), transitions.size() };
 
-// ErrorCode SfcAdapter::ExecuteCycle() {
-//     if (!application) {
-//         return ErrorCode::NOT_YET_INITIALIZED;
-//     }
+    // Create application with the correct context type
+    application = new sfc::Application(context);
+    application->activate();
+
+    // Initial hardware update to set the starting state
+    UpdateHardware();
+
+    ESP_LOGI(SFC_TAG, "SFC loaded successfully");
+    return ErrorCode::OK;
+}
+
+ErrorCode SfcAdapter::ExecuteCycle(uint32_t ms)
+{
+    if (!application) {
+        return ErrorCode::NOT_YET_INITIALIZED;
+    }
     
-//     // Update inputs from hardware
-//     UpdateInputs();
+      // Timer tick hinzufügen:
+    for (auto& timer : timers) {
+        timer->onTick(ms);
+    }
     
-//     // Execute one SFC cycle
-//     application->onTick(1);  // 1ms tick
+    ESP_LOGI(SFC_TAG, "SFC Tick");  
     
-//     // Update hardware based on SFC state
-//     UpdateHardware();
+    application->onTick(ms);
     
-//     return ErrorCode::OK;
-// }
+    // Update hardware based on SFC state
+    UpdateHardware();
+    
+    return ErrorCode::OK;
+}
+void SfcAdapter::Reset() {
+    if (application) {
+        delete application;
+        application = nullptr;
+    }
 
-// void SfcAdapter::Reset() {
-//     if (application) {
-//         delete application;
-//         application = nullptr;
-//     }
-    
-//     // Clean up actions
-//     for (auto action : actions) {
-//         delete action;
-//     }
-    
-//     // Clear containers
-//     steps.clear();
-//     actions.clear();
-//     transitions.clear();
-//     boolVarMap.clear();
-//     intVarMap.clear();
-//     floatVarMap.clear();
-    
-//     // Reset context
-//     context = { {NULL, 0}, {NULL, 0}, {NULL, 0} };
-    
-//     // Reset LED variables
-//     redLightVar = "";
-//     yellowLightVar = "";
-//     greenLightVar = "";
-//     hasLedMapping = false;
-// }
+    // Clean up actions
+    for (auto action : actions) {
+        delete action;
+    }
 
-// ErrorCode SfcAdapter::ParseJson(cJSON* root) {
-//     // Parse steps
-//     cJSON* stepsArray = cJSON_GetObjectItem(root, "steps");
-//     if (!stepsArray || !cJSON_IsArray(stepsArray)) {
-//         ESP_LOGE(SFC_TAG, "Steps not found or not an array");
-//         return ErrorCode::INVALID_NEW_FBD;
-//     }
+    // Clear containers
+    steps.clear();
+    actions.clear();
+    transitions.clear();
+    boolVarMap.clear();
+    intVarMap.clear();
+    floatVarMap.clear();
+
+    // Reset context
+    context = { {NULL, 0}, {NULL, 0}, {NULL, 0} };
+
+    // Reset LED variables
+    hasLedMapping = false;
+
+    // Clear handler context vectors
+    allInputStepArrays.clear();
+    allOutputStepArrays.clear();
+    allHandlerArrays.clear();
+}
+
+ErrorCode SfcAdapter::ParseJson(cJSON* root) {
+    // Reset all containers
+    steps.clear();
+    for (auto action : actions) {
+        delete action;
+    }
+    actions.clear();
+    transitions.clear();
+    boolVarMap.clear();
+    intVarMap.clear();
+    floatVarMap.clear();
+
+    // 1. Parse boolean variables
+    cJSON* booleans = cJSON_GetObjectItem(root, "booleans");
+    if (!booleans) {
+        return ErrorCode::INVALID_NEW_FBD;
+    }
+
+    const char* categories[] = {"hardware", "custom"};
+    for (const char* category : categories) {
+        cJSON* section = cJSON_GetObjectItem(booleans, category);
+        if (section) {
+            cJSON* var;
+            cJSON_ArrayForEach(var, section) {
+                std::string name = var->string;
+                bool value = cJSON_IsTrue(var);
+                boolVarMap[name] = value;
+            }
+        }
+    }
+
+    // 2. Parse steps
+    cJSON* stepsArray = cJSON_GetObjectItem(root, "steps");
+    if (!stepsArray || !cJSON_IsArray(stepsArray)) {
+        return ErrorCode::INVALID_NEW_FBD;
+    }
+
+    // Find entry point
+    cJSON* startStep = cJSON_GetObjectItem(root, "start");
+    std::string startStepId = startStep ? startStep->valuestring : "";
+    if (startStepId.empty()) {
+        return ErrorCode::INVALID_NEW_FBD;
+    }
+
+    // Create steps and index mapping
+    std::map<std::string, size_t> stepUidToIndex;
+    cJSON* step;
+    int stepIndex = 0;
     
-//     // Create steps
-//     int stepCount = cJSON_GetArraySize(stepsArray);
-//     steps.reserve(stepCount);
-    
-//     for (int i = 0; i < stepCount; i++) {
-//         cJSON* stepObj = cJSON_GetArrayItem(stepsArray, i);
+    cJSON_ArrayForEach(step, stepsArray) {
+        cJSON* uid = cJSON_GetObjectItem(step, "uid");
+        if (!uid || !cJSON_IsString(uid)) {
+            continue;
+        }
         
-//         cJSON* idObj = cJSON_GetObjectItem(stepObj, "id");
-//         cJSON* initialObj = cJSON_GetObjectItem(stepObj, "initial");
+        std::string stepUid = uid->valuestring;
+        bool isEntryPoint = (stepUid == startStepId);
         
-//         bool isInitial = initialObj && cJSON_IsTrue(initialObj);
-//         steps.emplace_back(isInitial);
+        steps.push_back(sfc::Step(isEntryPoint));
+        stepUidToIndex[stepUid] = stepIndex++;
+    }
+
+    // 3. Parse actions
+    stepIndex = 0;
+    cJSON_ArrayForEach(step, stepsArray) {
+        cJSON* actionsArray = cJSON_GetObjectItem(step, "actions");
+        if (!actionsArray || !cJSON_IsArray(actionsArray)) {
+            stepIndex++;
+            continue;
+        }
         
-//         // Add actions for this step
-//         cJSON* actionsArray = cJSON_GetObjectItem(stepObj, "actions");
-//         if (actionsArray && cJSON_IsArray(actionsArray)) {
-//             int actionCount = cJSON_GetArraySize(actionsArray);
+        cJSON* actionItem;
+        cJSON_ArrayForEach(actionItem, actionsArray) {
+            cJSON* targetBool = cJSON_GetObjectItem(actionItem, "targetBoolean");
+            cJSON* qualifier = cJSON_GetObjectItem(actionItem, "qualifier");
+            cJSON* ms_time = cJSON_GetObjectItem(actionItem, "ms_time");
+            int msTime = (ms_time && cJSON_IsNumber(ms_time)) ? ms_time->valueint : 0;
+
+            if (!targetBool || !cJSON_IsString(targetBool) || 
+                !qualifier || !cJSON_IsString(qualifier)) {
+                continue;
+            }
+
+            std::string targetBoolName = targetBool->valuestring;
+            std::string qualifierStr = qualifier->valuestring;
+            sfc::Action* action = nullptr;
+
+            if (qualifierStr == "N") {
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, true);
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, false);
+                    }}
+                });
+                action = new sfc::NonStoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "R") {
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, false);
+                    }}
+                });
+                action = new sfc::StoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "S") {
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, true);
+                    }}
+                });
+                action = new sfc::StoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "L" && msTime > 0) {
+                timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
+                sfc::Timer* timerPtr = timers.back().get();
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, true);
+                        timerPtr->enable();
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, false);
+                        timerPtr->disable();
+                    }}
+                });
+                action = new sfc::NonStoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "D" && msTime > 0) {
+                timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
+                sfc::Timer* timerPtr = timers.back().get();
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [timerPtr](const sfc::stateful_state_t&) {
+                        timerPtr->enable();
+                    }},
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        if (timerPtr->getState()->interrupted)
+                            this->SetBoolVar(targetBoolName, true);
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, false);
+                        timerPtr->disable();
+                    }}
+                });
+                action = new sfc::NonStoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "P") {
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        bool current = this->GetBoolVar(targetBoolName);
+                        this->SetBoolVar(targetBoolName, !current);
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        bool current = this->GetBoolVar(targetBoolName);
+                        this->SetBoolVar(targetBoolName, !current);
+                    }}
+                });
+                action = new sfc::NonStoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "SD" && msTime > 0) {
+                timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
+                sfc::Timer* timerPtr = timers.back().get();
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [timerPtr](const sfc::stateful_state_t&) {
+                        timerPtr->enable();
+                    }},
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        if (timerPtr->getState()->interrupted)
+                            this->SetBoolVar(targetBoolName, true);
+                    }}
+                });
+                action = new sfc::StoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "DS" && msTime > 0) {
+                timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
+                sfc::Timer* timerPtr = timers.back().get();
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [timerPtr](const sfc::stateful_state_t&) {
+                        timerPtr->enable();
+                    }},
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        if (timerPtr->getState()->interrupted)
+                            this->SetBoolVar(targetBoolName, true);
+                    }}
+                });
+                action = new sfc::StoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+            else if (qualifierStr == "SL" && msTime > 0) {
+                timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
+                sfc::Timer* timerPtr = timers.back().get();
+                allHandlerArrays.push_back({
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, true);
+                        timerPtr->enable();
+                    }},
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        if (timerPtr->getState()->interrupted)
+                            this->SetBoolVar(targetBoolName, false);
+                    }}
+                });
+                action = new sfc::StoredAction(
+                    stepIndex,
+                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
+                );
+            }
+
+            if (action) {
+                actions.push_back(action);
+            }
+        }
+        
+        stepIndex++;
+    }
+
+    // 4. Parse transitions
+    stepIndex = 0;
+    cJSON_ArrayForEach(step, stepsArray) {
+        cJSON* uid = cJSON_GetObjectItem(step, "uid");
+        if (!uid || !cJSON_IsString(uid)) {
+            stepIndex++;
+            continue;
+        }
+        std::string sourceStepId = uid->valuestring;
+        
+        cJSON* transitionsArray = cJSON_GetObjectItem(step, "outgoingTransitions");
+        if (!transitionsArray || !cJSON_IsArray(transitionsArray)) {
+            stepIndex++;
+            continue;
+        }
+        
+        cJSON* transition;
+        cJSON_ArrayForEach(transition, transitionsArray) {
+            cJSON* condition = cJSON_GetObjectItem(transition, "condition");
+            cJSON* target = cJSON_GetObjectItem(transition, "target");
             
-//             for (int j = 0; j < actionCount; j++) {
-//                 cJSON* actionObj = cJSON_GetArrayItem(actionsArray, j);
-                
-//                 cJSON* nameObj = cJSON_GetObjectItem(actionObj, "name");
-//                 cJSON* qualifierObj = cJSON_GetObjectItem(actionObj, "qualifier");
-                
-//                 if (!nameObj || !cJSON_IsString(nameObj)) {
-//                     continue;
-//                 }
-                
-//                 // Create appropriate action type based on qualifier
-//                 sfc::Action* action = nullptr;
-//                 const char* qualifier = qualifierObj && cJSON_IsString(qualifierObj) ? 
-//                                       qualifierObj->valuestring : "N";
-                
-//                 if (strcmp(qualifier, "S") == 0) {
-//                     // Stored action
-//                     action = new sfc::StoredAction(i);
-//                 } else {
-//                     // Non-stored action
-//                     action = new sfc::NonStoredAction(i);
-//                 }
-                
-//                 actions.push_back(action);
-//             }
-//         }
-//     }
-    
-//     // Parse transitions
-//     cJSON* transitionsArray = cJSON_GetObjectItem(root, "transitions");
-//     if (!transitionsArray || !cJSON_IsArray(transitionsArray)) {
-//         ESP_LOGE(SFC_TAG, "Transitions not found or not an array");
-//         return ErrorCode::INVALID_NEW_FBD;
-//     }
-    
-//     // Create transitions
-//     int transitionCount = cJSON_GetArraySize(transitionsArray);
-//     transitions.reserve(transitionCount);
-    
-//     for (int i = 0; i < transitionCount; i++) {
-//         cJSON* transObj = cJSON_GetArrayItem(transitionsArray, i);
-        
-//         cJSON* idObj = cJSON_GetObjectItem(transObj, "id");
-//         cJSON* conditionObj = cJSON_GetObjectItem(transObj, "condition");
-//         cJSON* sourcesObj = cJSON_GetObjectItem(transObj, "sources");
-//         cJSON* targetsObj = cJSON_GetObjectItem(transObj, "targets");
-        
-//         if (!idObj || !cJSON_IsString(idObj) || 
-//             !sourcesObj || !cJSON_IsArray(sourcesObj) ||
-//             !targetsObj || !cJSON_IsArray(targetsObj)) {
-//             continue;
-//         }
-        
-//         // Get condition
-//         const char* condition = conditionObj && cJSON_IsString(conditionObj) ? 
-//                                conditionObj->valuestring : "1";
-        
-//         // Create predicate function
-//         sfc::predicate_fnc predicate = CreatePredicate(condition);
-        
-//         // Get source step IDs
-//         std::vector<int> sourceIds;
-//         int sourceCount = cJSON_GetArraySize(sourcesObj);
-//         for (int j = 0; j < sourceCount; j++) {
-//             cJSON* sourceObj = cJSON_GetArrayItem(sourcesObj, j);
-//             if (cJSON_IsNumber(sourceObj)) {
-//                 sourceIds.push_back(sourceObj->valueint);
-//             }
-//         }
-        
-//         // Get target step IDs
-//         std::vector<int> targetIds;
-//         int targetCount = cJSON_GetArraySize(targetsObj);
-//         for (int j = 0; j < targetCount; j++) {
-//             cJSON* targetObj = cJSON_GetArrayItem(targetsObj, j);
-//             if (cJSON_IsNumber(targetObj)) {
-//                 targetIds.push_back(targetObj->valueint);
-//             }
-//         }
-        
-//         // Create transition
-//         sfc::array<int> sourceIdArray = { sourceIds.data(), sourceIds.size() };
-//         sfc::array<int> targetIdArray = { targetIds.data(), targetIds.size() };
-//         transitions.emplace_back(sourceIdArray, targetIdArray, predicate);
-//     }
-    
-//     // Parse boolean variables from the JSON
-//     cJSON* booleansObj = cJSON_GetObjectItem(root, "booleans");
-//     if (booleansObj && cJSON_IsObject(booleansObj)) {
-//         // Create boolean variables and map them
-//         int boolIndex = 0;
-//         cJSON* item;
-//         cJSON_ArrayForEach(item, booleansObj) {
-//             if (item->string) {
-//                 std::string varName(item->string);
-//                 boolVarMap[varName] = boolIndex++;
-                
-//                 // Log the boolean variable mapping
-//                 ESP_LOGI(SFC_TAG, "Mapped boolean variable '%s' to index %d", varName.c_str(), boolIndex-1);
-//             }
-//         }
-//     }
-    
-//     // Look for action target booleans (these control the LEDs)
-//     hasLedMapping = false;
-//     for (int i = 0; i < stepCount; i++) {
-//         cJSON* stepObj = cJSON_GetArrayItem(stepsArray, i);
-//         cJSON* actionsArray = cJSON_GetObjectItem(stepObj, "actions");
-        
-//         if (actionsArray && cJSON_IsArray(actionsArray)) {
-//             int actionCount = cJSON_GetArraySize(actionsArray);
+            std::string conditionStr;
+            if (condition && cJSON_IsArray(condition) && cJSON_GetArraySize(condition) > 0) {
+                cJSON* firstCond = cJSON_GetArrayItem(condition, 0);
+                if (firstCond && cJSON_IsString(firstCond)) {
+                    conditionStr = firstCond->valuestring;
+                }
+            } else if (condition && cJSON_IsString(condition)) {
+                conditionStr = condition->valuestring;
+            }
+            if (conditionStr.empty()) continue;
             
-//             for (int j = 0; j < actionCount; j++) {
-//                 cJSON* actionObj = cJSON_GetArrayItem(actionsArray, j);
-//                 cJSON* targetObj = cJSON_GetObjectItem(actionObj, "targetBoolean");
-                
-//                 if (targetObj && cJSON_IsString(targetObj)) {
-//                     std::string targetName = targetObj->valuestring;
-                    
-//                     // Check if this is a light control action
-//                     if (targetName == "redLight") {
-//                         redLightVar = targetName;
-//                         hasLedMapping = true;
-//                     } else if (targetName == "yellowLight") {
-//                         yellowLightVar = targetName;
-//                         hasLedMapping = true;
-//                     } else if (targetName == "greenLight") {
-//                         greenLightVar = targetName;
-//                         hasLedMapping = true;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-    
-//     if (hasLedMapping) {
-//         ESP_LOGI(SFC_TAG, "Found LED mapping variables: red=%s, yellow=%s, green=%s", 
-//                  redLightVar.c_str(), yellowLightVar.c_str(), greenLightVar.c_str());
-//     } else {
-//         ESP_LOGW(SFC_TAG, "No LED mapping variables found in SFC program");
-//     }
-    
-//     // Set up context
-//     context.steps = { steps.data(), steps.size() };
-//     context.actions = { actions.data(), actions.size() };
-//     context.transitions = { transitions.data(), transitions.size() };
-    
-//     return ErrorCode::OK;
-// }
+            std::string targetStepId;
+            if (target && cJSON_IsArray(target) && cJSON_GetArraySize(target) > 0) {
+                cJSON* firstTarget = cJSON_GetArrayItem(target, 0);
+                if (firstTarget && cJSON_IsString(firstTarget)) {
+                    targetStepId = firstTarget->valuestring;
+                }
+            } else if (target && cJSON_IsString(target)) {
+                targetStepId = target->valuestring;
+            }
+            if (targetStepId.empty()) continue;
+            
+            // Validate step indices
+            if (stepUidToIndex.find(sourceStepId) == stepUidToIndex.end() ||
+                stepUidToIndex.find(targetStepId) == stepUidToIndex.end()) {
+                continue;
+            }
+            
+            int sourceIndex = stepUidToIndex[sourceStepId];
+            int targetIndex = stepUidToIndex[targetStepId];
+            
+            // Create predicate function
+            auto predicateFn = CreatePredicate(conditionStr.c_str());
+            
+            // Create input and output arrays
+            allInputStepArrays.push_back({sourceIndex});
+            allOutputStepArrays.push_back({targetIndex});
+            // Create and add transition
+            sfc::Transition newTransition(
+                sfc::arrayof(allInputStepArrays.back().data(), allInputStepArrays.back().size()),
+                sfc::arrayof(allOutputStepArrays.back().data(), allOutputStepArrays.back().size()),
+                predicateFn
+            );
+            
+            transitions.push_back(newTransition);
+        }
+        
+        stepIndex++;
+    }
 
-// sfc::predicate_fnc SfcAdapter::CreatePredicate(const char* condition) {
-//     // For simple implementation, create a lambda that evaluates the condition
-//     std::string condStr(condition);
-    
-//     return [this, condStr]() -> bool {
-//         // Implement condition evaluation based on your variables
-//         // Example: check if a binary variable with this name is true
-//         auto it = boolVarMap.find(condStr);
-//         if (it != boolVarMap.end()) {
-//             return deviceManager->GetBinary(it->second);
-//         }
-        
-//         // For numeric conditions, parse and evaluate
-//         // This is a simple implementation - you'd want more robust parsing
-        
-//         // Default to true if condition can't be evaluated
-//         return true;
-//     };
-// }
+    // Validate we have at least one step
+    if (steps.empty()) {
+        return ErrorCode::INVALID_NEW_FBD;
+    }
 
-// void SfcAdapter::UpdateInputs() {
-//     // Implement timers for the traffic light
-//     static uint32_t lastTimerUpdate = 0;
-//     uint32_t now = deviceManager->GetHAL()->GetMillis();
-    
-//     // Update timers every 1000ms (1 second)
-//     if (now - lastTimerUpdate >= 1000) {
-//         lastTimerUpdate = now;
-        
-//         // Simple timer implementation for demonstration
-//         // In a real implementation, these would be more sophisticated timers
-        
-//         // Check for timer variables and toggle them if they exist
-//         static int timerCounter = 0;
-//         timerCounter++;
-        
-//         // Red phase timer (about 5 seconds)
-//         auto redTimerIt = boolVarMap.find("redTimer");
-//         if (redTimerIt != boolVarMap.end()) {
-//             // Set to true after 5 seconds
-//             bool timerDone = (timerCounter % 5 == 0);
-//             deviceManager->SetBinary(redTimerIt->second, timerDone);
-//         }
-        
-//         // Red-Yellow phase timer (about 2 seconds)
-//         auto redYellowTimerIt = boolVarMap.find("redYellowTimer");
-//         if (redYellowTimerIt != boolVarMap.end()) {
-//             // Set to true after 2 seconds
-//             bool timerDone = (timerCounter % 2 == 0);
-//             deviceManager->SetBinary(redYellowTimerIt->second, timerDone);
-//         }
-        
-//         // Green phase timer (about 5 seconds)
-//         auto greenTimerIt = boolVarMap.find("greenTimer");
-//         if (greenTimerIt != boolVarMap.end()) {
-//             // Set to true after 5 seconds
-//             bool timerDone = (timerCounter % 5 == 0);
-//             deviceManager->SetBinary(greenTimerIt->second, timerDone);
-//         }
-        
-//         // Yellow phase timer (about 2 seconds)
-//         auto yellowTimerIt = boolVarMap.find("yellowTimer");
-//         if (yellowTimerIt != boolVarMap.end()) {
-//             // Set to true after 2 seconds
-//             bool timerDone = (timerCounter % 2 == 0);
-//             deviceManager->SetBinary(yellowTimerIt->second, timerDone);
-//         }
-//     }
-// }
+    return ErrorCode::OK;
+}
 
-// void SfcAdapter::UpdateHardware() {
-//     // Check if we have LED variable mappings
-//     if (!hasLedMapping) {
-//         return;
-//     }
+sfc::predicate_fnc SfcAdapter::CreatePredicate(const char* condition) {
+    std::string condStr(condition);
     
-//     // Control LEDs based on SFC boolean variable states
-//     bool redOn = false;
-//     bool yellowOn = false;
-//     bool greenOn = false;
+    // Erkennen von komplexeren Bedingungen
+    if (condStr.find("==") != std::string::npos) {
+        // Format: "variable == value"
+        std::string varName = condStr.substr(0, condStr.find("=="));
+        std::string valueStr = condStr.substr(condStr.find("==") + 2);
+        
+        // Whitespace entfernen
+        varName.erase(0, varName.find_first_not_of(" \t"));
+        varName.erase(varName.find_last_not_of(" \t") + 1);
+        valueStr.erase(0, valueStr.find_first_not_of(" \t"));
+        valueStr.erase(valueStr.find_last_not_of(" \t") + 1);
+        
+        bool expectedValue = (valueStr == "true");
+        
+        return [this, varName, expectedValue]() -> bool {
+            auto it = boolVarMap.find(varName);
+            if (it == boolVarMap.end()) {
+                ESP_LOGE(SFC_TAG, "Variable not found in boolean map");
+                return false;
+            }
+            
+            return it->second == expectedValue;
+        };
+    } 
+    else if (condStr.find("!=") != std::string::npos) {
+        // Format: "variable != value"
+        std::string varName = condStr.substr(0, condStr.find("!="));
+        std::string valueStr = condStr.substr(condStr.find("!=") + 2);
+        
+        // Whitespace entfernen
+        varName.erase(0, varName.find_first_not_of(" \t"));
+        varName.erase(varName.find_last_not_of(" \t") + 1);
+        valueStr.erase(0, valueStr.find_first_not_of(" \t"));
+        valueStr.erase(valueStr.find_last_not_of(" \t") + 1);
+        
+        bool expectedValue = (valueStr == "true");
+        
+        return [this, varName, expectedValue]() -> bool {
+            auto it = boolVarMap.find(varName);
+            if (it == boolVarMap.end()) {
+                ESP_LOGE(SFC_TAG, "Variable  not found in boolean map");
+                return false;
+            }
+            
+            return it->second != expectedValue;
+        };
+    }
     
-//     // Get the current state of each LED from the DeviceManager
-//     if (!redLightVar.empty()) {
-//         auto it = boolVarMap.find(redLightVar);
-//         if (it != boolVarMap.end()) {
-//             redOn = deviceManager->GetBinary(it->second);
-//         }
-//     }
-    
-//     if (!yellowLightVar.empty()) {
-//         auto it = boolVarMap.find(yellowLightVar);
-//         if (it != boolVarMap.end()) {
-//             yellowOn = deviceManager->GetBinary(it->second);
-//         }
-//     }
-    
-//     if (!greenLightVar.empty()) {
-//         auto it = boolVarMap.find(greenLightVar);
-//         if (it != boolVarMap.end()) {
-//             greenOn = deviceManager->GetBinary(it->second);
-//         }
-//     }
-    
-//     // Control the physical LEDs using the HAL
-//     // LED index 0 = red, 1 = yellow, 2 = green as per FB_RedLED, FB_YellowLED, FB_GreenLED
-//     deviceManager->GetHAL()->ColorizeLed(0, redOn ? CRGB::DarkRed : CRGB::Black);
-//     deviceManager->GetHAL()->ColorizeLed(1, yellowOn ? CRGB::Yellow : CRGB::Black);
-//     deviceManager->GetHAL()->ColorizeLed(2, greenOn ? CRGB::DarkGreen : CRGB::Black);
-    
-//     ESP_LOGD(SFC_TAG, "Updated LED states: R=%d Y=%d G=%d", redOn, yellowOn, greenOn);
-// }
+    ESP_LOGE(SFC_TAG, "Unsupported condition format");
+    return []() -> bool { return false; };
+}
+
+void SfcAdapter::UpdateHardware() {
+    auto hal = deviceManager->GetHAL();
+
+    // Red LED
+    bool red = GetBoolVar(redLightVar);
+    hal->ColorizeLed(0, red ? CRGB::DarkRed : CRGB::Black);
+
+    // Yellow LED
+    bool yellow = GetBoolVar(yellowLightVar);
+    hal->ColorizeLed(1, yellow ? CRGB::Yellow : CRGB::Black);
+
+    // Green LED
+    bool green = GetBoolVar(greenLightVar);
+    hal->ColorizeLed(2, green ? CRGB::DarkGreen : CRGB::Black);
+
+    // Debug output
+    ESP_LOGI(SFC_TAG, "LED states:");
+    ESP_LOGI(SFC_TAG, "Red LED state: %s", red ? "ON" : "OFF");
+    ESP_LOGI(SFC_TAG, "Yellow LED state: %s", yellow ? "ON" : "OFF");
+    ESP_LOGI(SFC_TAG, "Green LED state: %s", green ? "ON" : "OFF");
+
+    // Booleans
+    ESP_LOGI(SFC_TAG, "Boolean states:");
+    for (const auto &pair : boolVarMap)
+    {
+        ESP_LOGI(SFC_TAG, "%s: %s", pair.first.c_str(), pair.second ? "true" : "false");
+    }
+
+    // Timers
+    ESP_LOGI(SFC_TAG, "Timer states:");
+    int timerIdx = 0;
+    for (const auto &timer : timers)
+    {
+        auto *state = timer->getState();
+        ESP_LOGI(SFC_TAG, "Timer %d: enabled: %s, interrupted: %s, elapsed: %lu ms / %lu ms",
+                 timerIdx,
+                 state->enabled ? "true" : "false",
+                 state->interrupted ? "true" : "false",
+                 static_cast<unsigned long>(state->current_time),
+                 static_cast<unsigned long>(timer->getPeriod() ? *timer->getPeriod() : 0));
+        timerIdx++;
+    }
+}
+
+void SfcAdapter::SetBoolVar(const std::string& name, bool value) {
+    auto it = boolVarMap.find(name);
+    if (it != boolVarMap.end()) {
+        it->second = value;
+    }
+}
+
+bool SfcAdapter::GetBoolVar(const std::string& name) const {
+    auto it = boolVarMap.find(name);
+    if (it != boolVarMap.end()) {
+        return it->second;
+    }
+    return false;
+}

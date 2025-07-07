@@ -3,28 +3,28 @@
   "steps": [
     {
       "uid": "step1",
-      "caption": "Test_Green_On",
+      "caption": "Green an",
       "actions": [
         {
           "codeUid": "act1_1",
-          "caption": "Grün einschalten",
+          "caption": "Green_LED einschalten",
           "targetBoolean": "Green_LED",
-          "qualifier": "S0",
+          "qualifier": "N",
           "ms_time": 0
         },
         {
           "codeUid": "act1_2",
-          "caption": "Timer setzen (true nach 2s)",
-          "targetBoolean": "timerBool",
-          "qualifier": "S0",
-          "ms_time": 2000
+          "caption": "Timer1Flag setzen nach Verzögerung",
+          "targetBoolean": "Timer1Flag",
+          "qualifier": "D",
+          "ms_time": 500
         }
       ],
       "outgoingTransitions": [
         {
           "type": "simple",
           "condition": [
-            "timerBool == true"
+            "Timer1Flag == true"
           ],
           "sourceDone": [
             true
@@ -40,28 +40,28 @@
     },
     {
       "uid": "step2",
-      "caption": "Test_Green_Off",
+      "caption": "Green aus",
       "actions": [
         {
           "codeUid": "act2_1",
-          "caption": "Grün ausschalten",
+          "caption": "Green_LED ausschalten",
           "targetBoolean": "Green_LED",
           "qualifier": "N",
           "ms_time": 0
         },
         {
           "codeUid": "act2_2",
-          "caption": "Timer zurücksetzen (false)",
-          "targetBoolean": "timerBool",
-          "qualifier": "N",
-          "ms_time": 0
+          "caption": "Timer2Flag setzen nach Verzögerung",
+          "targetBoolean": "Timer2Flag",
+          "qualifier": "D",
+          "ms_time": 500
         }
       ],
       "outgoingTransitions": [
         {
           "type": "simple",
           "condition": [
-            "timerBool == false"
+            "Timer2Flag == true"
           ],
           "sourceDone": [
             true
@@ -83,7 +83,8 @@
       "Green_LED": false
     },
     "custom": {
-      "timerBool": false
+      "Timer1Flag": false,
+      "Timer2Flag": false
     }
   }
 }

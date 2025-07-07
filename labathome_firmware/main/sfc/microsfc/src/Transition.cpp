@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "Transition.h"
+#include "esp_log.h"
+#define SFC_TAG "SFC"
 
 namespace sfc {
 
@@ -36,19 +38,23 @@ Transition::Transition() {
 
 void Transition::onActivationChanged(StepContext * const& context) {
 	bool step_precondition = true;
-
+	ESP_LOGI(SFC_TAG, "SFC onAcChange 1");
 	for (size_t i = 0; i < this->input_step_ids.size; i++) {
+		ESP_LOGI(SFC_TAG, "SFC onAcChange 2");
 		stateful_state_t step_state = context->getStepState(
 				*(this->input_step_ids.ptr + i));
 		step_precondition = step_precondition & step_state.active;
 	}
-
+	ESP_LOGI(SFC_TAG, "SFC onAcChange 4");
 	if (step_precondition && this->condition()) {
+		ESP_LOGI(SFC_TAG, "SFC onAcChange 5");
 		for (size_t i = 0; i < this->input_step_ids.size; i++) {
+			ESP_LOGI(SFC_TAG, "SFC onAcChange 6");
 			context->toggleStepState(*(this->input_step_ids.ptr + i),
 					false);
 		}
 		for (size_t i = 0; i < this->output_step_ids.size; i++) {
+			ESP_LOGI(SFC_TAG, "SFC onAcChange 7");
 			context->toggleStepState(*(this->output_step_ids.ptr + i),
 					true);
 		}

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include "Application.h"
+#include "esp_log.h"
+#define SFC_TAG "SFC"
 
 namespace sfc {
 
@@ -38,36 +40,43 @@ void Application::stateReported(const stateful_state_t &state) {
 }
 
 void Application::evaluateStates(const sfc::time_t &delta) {
-	this->component_delta = delta;
-
-	if(PTR_ACTIVATING(this->getState())) {
-		ARRAY_FOREACH(size_t, i, this->getContext()->steps) {
-			if(this->isEntryPoint(i)) {
-				ARRAY_GET(this->getContext()->steps, i)->activate();
+	
+	this->component_delta = delta;	
+	if(PTR_ACTIVATING(this->getState())) {		
+		ARRAY_FOREACH(size_t, i, this->getContext()->steps) {			
+			if(this->isEntryPoint(i)) {				
+				ARRAY_GET(this->getContext()->steps, i)->activate();				
 			}
 		}
 	} else if(PTR_DEACTIVATING(this->getState())) {
 		// Shutdown steps
-		ARRAY_FOREACH(size_t, i, this->getContext()->steps) {
+		ARRAY_FOREACH(size_t, i, this->getContext()->steps) {			
 			ARRAY_GET(this->getContext()->steps, i)->shutdown();
 		}
 		// Shutdown actions
-		ARRAY_FOREACH(size_t, i, this->getContext()->actions) {
-			(*ARRAY_GET(this->getContext()->actions, i))->shutdown();
+		ARRAY_FOREACH(size_t, i, this->getContext()->actions) {			
+			(*ARRAY_GET(this->getContext()->actions, i))->shutdown();			
 		}
 	} 
 	
-	if(this->getState()->active) {
-		this->evaluateTransitions();
-		this->evaluateActions();
+	if(this->getState()->active) {		
+		this->evaluateTransitions();		
+		this->evaluateActions();		
 	}
+	
 }
 
 void Application::evaluateTransitions() {
-	for(size_t i = 0; i < this->container_context.transitions.size; i++) {
-		Transition * transition = (this->container_context.transitions.ptr) + i;
-		transition->onActivationChanged(this);
-	}
+    // Safety check
+    if (this->container_context.transitions.ptr == NULL || 
+        this->container_context.transitions.size == 0) {
+        ESP_LOGW(SFC_TAG, "No transitions to evaluate");
+        return;
+    }
+    for(size_t i = 0; i < this->container_context.transitions.size; i++) {
+        Transition * transition = (this->container_context.transitions.ptr) + i;
+        transition->onActivationChanged(this);
+    }
 }
 void Application::evaluateActions() {
 	for(size_t i = 0; i < this->container_context.actions.size; i++) {
@@ -90,9 +99,7 @@ void Application::performComponentTick(const sfc::time_t &delta) {
 
 void Application::onTick(const sfc::time_t &delta) {
 	StatefulObject::onTick(delta);
-	
 	evaluate = !evaluate;
-
 	if(evaluate) {
 		evaluateStates(delta);
 	} else {
@@ -134,7 +141,7 @@ void Application::toggleStepState(const int &id, const bool &active) {
 	}
 }
 
-component_context_t * const Application::getContext() {
+component_context_t * Application::getContext() {
 	return &(this->container_context);
 }
 

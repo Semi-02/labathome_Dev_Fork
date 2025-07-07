@@ -1,24 +1,24 @@
-// #pragma once
+#pragma once
 
-// #include "devicemanager.hh"
-// #include "sfc_adapter.hh"
-// #include <memory>
+#include "sfc_adapter.hh"
+#include <memory>
 
-// // Define SFC_TAG for logging
-// #define SFC_TAG "SFC"
+#define SFC_TAG "SFC"
 
-// class SequentialFunctionBlocks {
-// private:
-//     DeviceManager* deviceManager;
-//     std::unique_ptr<SfcAdapter> adapter;
-//     bool initialized;
+class DeviceManager; // Forward declaration
 
-// public:
-//     SequentialFunctionBlocks(DeviceManager* deviceManager);
-//     ~SequentialFunctionBlocks();
-        
-//     void Reset();
-//     ErrorCode LoadSfcFromFile(const char* filepath);
-//     ErrorCode ExecuteCycle();
-//     bool IsInitialized() const { return initialized; }
-// };
+class SequentialFunctionBlocks {
+private:
+    DeviceManager* deviceManager;
+    std::unique_ptr<SfcAdapter> adapter;
+    bool initialized = false;
+
+public:
+    SequentialFunctionBlocks(DeviceManager* deviceManager);
+    ~SequentialFunctionBlocks();
+
+    ErrorCode LoadSfcFromFile(const char* filepath);
+    void Tick(uint32_t ms);
+    bool IsInitialized() const { return initialized; }
+    void Reset();
+};

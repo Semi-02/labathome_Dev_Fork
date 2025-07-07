@@ -25,7 +25,7 @@ typedef void (*timer_interrupt_callback_t)(const sfc::time_t &time);
 class Timer: public ClockListener {
 private:
 	sfc::time_t period;
-	bool continous;
+	bool continous = false;
 	timer_state_t timer_state;
 	timer_interrupt_callback_t interrupt_callback;
 public:

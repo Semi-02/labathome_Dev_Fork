@@ -23,6 +23,7 @@ constexpr const char *SFCSTORE_BASE_DIRECTORY = "/spiffs/sfcstore/";
 constexpr const char *DEFAULTSFC_FILEPATH = "/spiffs/defaultsfc.json"; 
 constexpr const char *TEMPSFC_FILEPATH = "/spiffs/tempsfc.json"; 
 class FunctionBlock;
+class SequentialFunctionBlocks;
 class Executable
 {
     public:
@@ -118,6 +119,7 @@ struct FFTExperimentData
 enum class ExperimentMode
 {
     functionblock,
+    sequential_functionblock,
     openloop_heater,
     closedloop_heater,
     openloop_ptn,
@@ -141,7 +143,10 @@ class DeviceManager:public FBContext
         float setpointTemperature=0;
         float heaterWorkingPointOffset{0};
 
-
+        // SFC Engine Adapter
+        SequentialFunctionBlocks* sfc = nullptr;
+        int64_t lastSfcTickMs = 0; // Zeitstempel des letzten SFC-Zyklus in Mikrosekunden
+        int64_t ms_delta = 0.0001; // Time delta in milliseconds for the last loop iteration
 
         float setpointFan=0;
         float setpointServo1=0;
@@ -153,6 +158,13 @@ class DeviceManager:public FBContext
         ErrorCode Loop();
         
     public:
+        //SFC 
+        bool IsSfcLoaded() const;
+        void TickSfc(uint32_t ms);
+        ErrorCode LoadSfcFromFile(const char *path);
+        //SFC Ende
+
+ 
         bool IsBinaryAvailable(size_t index);
         bool IsIntegerAvailable(size_t index);
         bool IsFloatAvailable(size_t index);

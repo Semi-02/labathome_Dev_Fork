@@ -17,17 +17,10 @@ class SequentialFunctionBlockPlugin : public webmanager::iWebmanagerPlugin
 {
 private:
     DeviceManager *devicemanager;
-    //SequentialFunctionBlocks *sfc;  // This class needs to be defined in sequentialfunctionblock.hh
-
+    
 public:
-    SequentialFunctionBlockPlugin(DeviceManager *devicemanager) : devicemanager(devicemanager) {
-       // this->sfc = new SequentialFunctionBlocks(devicemanager);
-    }
+    SequentialFunctionBlockPlugin(DeviceManager *devicemanager) : devicemanager(devicemanager) {}
     ~SequentialFunctionBlockPlugin() {
-        // if (sfc) {
-        //     delete sfc;
-        //     sfc = nullptr;
-        // }
     }
 
     void OnBegin(webmanager::iWebmanagerCallback *callback) override {
@@ -47,9 +40,7 @@ public:
         switch (reqType) {
         case functionblock::Requests::Requests_RequestSFCRun: {
             ESP_LOGI(TAG, "Got Requests_RequestSFCRun");
-            //const auto *request = rw->request_as_RequestSFCRun();
-            //hier können daten aus der Flatbuffer Anfrage extrahiert werden
-            //const char *sfcData = request->sfc_data()->c_str();
+          
    
 
             flatbuffers::FlatBufferBuilder b(256);
@@ -63,7 +54,7 @@ public:
             callback->WrapAndSendAsync(SFC_NAMESPACE_VALUE, b);
 
             ESP_LOGI(TAG, "SFC Data process");
-            // sfc->LoadSfcFromFile(TEMPSFC_FILEPATH);
+            devicemanager->LoadSfcFromFile(TEMPSFC_FILEPATH);
 
             return webmanager::eMessageReceiverResult::OK;
         }
