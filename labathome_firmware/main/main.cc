@@ -101,6 +101,70 @@ void StartOPCUAServer() {
     UA_Server_delete(server);
 }
 
+#include "open62541.h"
+
+#define OPC_UA_TAG "OPCUA"
+#define OPCUA_TASK_STACK_SIZE 16384  // 16 KB Stack für OPC UA Task
+#define OPCUA_TASK_PRIORITY   5      // Priorität im normalen Bereich
+
+static void opcua_server_task(void *pvParameters) {
+    ESP_LOGI(OPC_UA_TAG, "Starte OPC UA Task…");
+
+    UA_Server *server = UA_Server_new();
+    if(!server) {
+        ESP_LOGE(OPC_UA_TAG, "Fehler beim Erstellen des OPC UA Servers");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    UA_ServerConfig *config = UA_Server_getConfig(server);
+    UA_ServerConfig_setDefault(config);
+
+    // Beispiel: Füge eine Variable im Address Space hinzu
+    UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, "myInteger");
+    UA_VariableAttributes attr = UA_VariableAttributes_default;
+    UA_Int32 myInteger = 42;
+    UA_Variant_setScalar(&attr.value, &myInteger, &UA_TYPES[UA_TYPES_INT32]);
+    attr.displayName = UA_LOCALIZEDTEXT("en-US", "MyInteger");
+
+    UA_StatusCode addStatus = UA_Server_addVariableNode(
+        server,
+        myIntegerNodeId,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), // Parent Node: Objects folder
+        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),     // ReferenceType
+        UA_QUALIFIEDNAME(1, "MyInteger"),             // BrowseName
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
+        attr,
+        NULL,
+        NULL);
+
+    if(addStatus != UA_STATUSCODE_GOOD) {
+        ESP_LOGE(OPC_UA_TAG, "Variable konnte nicht hinzugefügt werden: 0x%08x", (unsigned int)addStatus);
+    }
+
+    UA_StatusCode rc = UA_Server_run_startup(server);
+    if(rc != UA_STATUSCODE_GOOD) {
+        ESP_LOGE(OPC_UA_TAG, "Startup-Fehler: 0x%08x", (unsigned int)rc);
+        UA_Server_delete(server);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    ESP_LOGI(OPC_UA_TAG, "OPC UA Server läuft auf opc.tcp://<esp32-ip>:4840");
+
+    while(true) {
+        // True = blockierend, besser bei FreeRTOS aber nicht für längere Blocking calls
+        // Besser: false + kurze Delays (oder kein Delay)
+        UA_Server_run_iterate(server, false);
+        vTaskDelay(pdMS_TO_TICKS(10)); // 10 ms Delay zum Yield
+    }
+
+    UA_Server_run_shutdown(server);
+    UA_Server_delete(server);
+    vTaskDelete(NULL);
+}
+
+
 extern "C" void app_main()
 {
     // Configure Logging
@@ -188,8 +252,13 @@ extern "C" void app_main()
 
     wm->CallMeAfterInitializationToMarkCurrentPartitionAsValid();
 
+<<<<<<< Updated upstream
     // Start OPC UA Server
     StartOPCUAServer();
+=======
+    xTaskCreate(opcua_server_task, "opcua_task", OPCUA_TASK_STACK_SIZE, NULL, OPCUA_TASK_PRIORITY, NULL);
+
+>>>>>>> Stashed changes
 
     // Start eternal supervisor loop
     TickType_t xLastWakeTime = xTaskGetTickCount();
