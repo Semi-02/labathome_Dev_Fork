@@ -108,16 +108,27 @@ void Application::onTick(const sfc::time_t &delta) {
 }
 
 void Application::clear() {
-	StatefulObject::clear();
-	this->evaluate = false;
-	this->component_delta = 0;
-
-	ARRAY_FOREACH(size_t, i, this->container_context.steps) {
-		ARRAY_GET(this->container_context.steps, i)->clear();
-	}
-	ARRAY_FOREACH(size_t, i, this->container_context.actions) {
-		this->container_context.actions.ptr[i]->clear();
-	}
+    // Stop all ongoing processing
+    evaluate = false;
+    
+    // Clear all steps with null check
+    if (container_context.steps.ptr != NULL) {
+        for (size_t i = 0; i < container_context.steps.size; i++) {
+            container_context.steps.ptr[i].clear();
+        }
+    }
+    
+    // Clear all actions with null check
+    if (container_context.actions.ptr != NULL) {
+        for (size_t i = 0; i < container_context.actions.size; i++) {
+            if (container_context.actions.ptr[i]) {
+                container_context.actions.ptr[i]->clear();
+            }
+        }
+    }
+    
+    // Reset the component delta
+    component_delta = 0;
 }
 
 const sfc::stateful_state_t& Application::getStepState(const int &id) {

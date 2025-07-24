@@ -48,11 +48,24 @@ void DeviceManager::TickSfc(uint32_t ms) {
 }
 
 ErrorCode DeviceManager::LoadSfcFromFile(const char *path) {
-    if (!sfc)
+    ESP_LOGI(TAG, "Loading SFC from file: %s", path);
+    
+    // Create SFC instance if it doesn't exist
+    if (!sfc) {
         sfc = new SequentialFunctionBlocks(this);
-    return sfc->LoadSfcFromFile(path);
+    }
+    
+    // Load the SFC from file without try-catch since exceptions are disabled
+    ErrorCode result = sfc->LoadSfcFromFile(path);
+    
+    if (result == ErrorCode::OK) {
+        ESP_LOGI(TAG, "SFC loaded successfully");
+    } else {
+        ESP_LOGE(TAG, "Failed to load SFC, error code: %d", static_cast<int>(result));
+    }
+    
+    return result;
 }
-//SFC Ende
 
 bool DeviceManager::IsBinaryAvailable(size_t index)
 {

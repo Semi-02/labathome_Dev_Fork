@@ -122,34 +122,47 @@ ErrorCode SfcAdapter::ExecuteCycle(uint32_t ms)
     return ErrorCode::OK;
 }
 void SfcAdapter::Reset() {
+    // Delete the application instance
     if (application) {
+        ESP_LOGI(SFC_TAG, "Shutting down existing SFC application");
+        application->shutdown();
+        
+        // Wait a small amount of time for resources to release
+        vTaskDelay(pdMS_TO_TICKS(10));
+        
+        // Now delete the application
         delete application;
         application = nullptr;
     }
-
-    // Clean up actions
-    for (auto action : actions) {
-        delete action;
-    }
-
-    // Clear containers
-    steps.clear();
+    
+    // Clear all vectors and maps
     actions.clear();
+    steps.clear();
     transitions.clear();
+    
+    // Clear variable maps
     boolVarMap.clear();
     intVarMap.clear();
     floatVarMap.clear();
-
-    // Reset context
-    context = { {NULL, 0}, {NULL, 0}, {NULL, 0} };
-
-    // Reset LED variables
-    hasLedMapping = false;
-
-    // Clear handler context vectors
+    
+    // Clear timer vectors if they exist
+    timers.clear();
+    
+    // Clear arrays for transitions
     allInputStepArrays.clear();
     allOutputStepArrays.clear();
     allHandlerArrays.clear();
+    
+    // Reset context
+    context = {
+        {nullptr, 0},
+        {nullptr, 0},
+        {nullptr, 0}
+    };
+    
+    hasLedMapping = false;
+    
+    ESP_LOGI(SFC_TAG, "SFC adapter reset complete");
 }
 
 ErrorCode SfcAdapter::ParseJson(cJSON* root) {

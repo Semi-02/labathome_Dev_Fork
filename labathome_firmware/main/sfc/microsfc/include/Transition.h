@@ -35,6 +35,7 @@ public:
 			predicate_fnc condition);
 	virtual ~Transition();
 	virtual void onActivationChanged(StepContext * const& context);
+	virtual void clear();
 };
 
 } /* namespace sfc */
