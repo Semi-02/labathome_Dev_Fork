@@ -58,6 +58,12 @@ public:
 
             return webmanager::eMessageReceiverResult::OK;
         }
+
+        case functionblock::Requests::Requests_RequestSFCStop:
+            ESP_LOGI(TAG, "Got Requests_RequestSFCStop");
+            // Handle SFC Stop request
+            return webmanager::eMessageReceiverResult::OK;
+
         default:
             return webmanager::eMessageReceiverResult::FOR_ME_BUT_FAILED;
         }
