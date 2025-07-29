@@ -56,13 +56,7 @@ public:
 	virtual void clear();
 	
 	virtual component_context_t * getContext();
-	virtual void shutdown() {
-		// First set evaluate to false to prevent further ticks
-		evaluate = false;
-		
-		// Call clear to release resources
-		clear();
-	}
+	virtual void shutdown();
 };
 
 } /* namespace sfc */

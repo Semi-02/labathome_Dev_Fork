@@ -1,26 +1,31 @@
 #include "sequentialfunctionblock.hh"
 
 SequentialFunctionBlocks::SequentialFunctionBlocks(DeviceManager* deviceManager)
-    : deviceManager(deviceManager) {}
+    : deviceManager(deviceManager) {
+    ESP_LOGI(SFC_TAG, "SequentialFunctionBlocks constructor called");
+    
+    // Erstelle sofort einen neuen Adapter
+    adapter = std::make_unique<SfcAdapter>(deviceManager);
+    ESP_LOGI(SFC_TAG, "SfcAdapter created in SequentialFunctionBlocks constructor");
+}
 
-SequentialFunctionBlocks::~SequentialFunctionBlocks() {}
+SequentialFunctionBlocks::~SequentialFunctionBlocks() {
+    ESP_LOGI(SFC_TAG, "SequentialFunctionBlocks destructor called");
+    
+    initialized = false;
+
+    if (adapter) {
+        ESP_LOGI(SFC_TAG, "Releasing SFC adapter");
+        adapter.reset(); // This will call SfcAdapter's destructor
+    }
+    
+    ESP_LOGI(SFC_TAG, "SequentialFunctionBlocks destructor completed");
+}
 
 ErrorCode SequentialFunctionBlocks::LoadSfcFromFile(const char* filepath) {
     ESP_LOGI(SFC_TAG, "Loading SFC from file: %s", filepath);
     
-    // First reset if we have an existing adapter
-    if (adapter) {
-        ESP_LOGI(SFC_TAG, "Resetting existing SFC adapter");
-        adapter->Reset();
-    } else {
-        // Create a new adapter if none exists
-        adapter = std::make_unique<SfcAdapter>(deviceManager);
-    }
-    
-    // Give a small delay to ensure resources are cleaned up
-    vTaskDelay(pdMS_TO_TICKS(20));
-    
-    // Now load the new configuration
+    // JSON zur Application wandeln 
     ErrorCode result = adapter->LoadFromFile(filepath);
     initialized = (result == ErrorCode::OK);
     
@@ -35,9 +40,4 @@ ErrorCode SequentialFunctionBlocks::LoadSfcFromFile(const char* filepath) {
 
 void SequentialFunctionBlocks::Tick(uint32_t ms) {
     if (initialized && adapter) adapter->ExecuteCycle(ms);
-}
-
-void SequentialFunctionBlocks::Reset() {
-    if (adapter) adapter->Reset();
-    initialized = false;
 }

@@ -42,28 +42,47 @@ bool DeviceManager::IsSfcLoaded() const {
 }
 
 void DeviceManager::TickSfc(uint32_t ms) {  
-    if (IsSfcLoaded()) {
+    if (sfc) {
         sfc->Tick(ms);
     }
 }
 
 ErrorCode DeviceManager::LoadSfcFromFile(const char *path) {
-    ESP_LOGI(TAG, "Loading SFC from file: %s", path);
+    static bool isLoading = false;
     
-    // Create SFC instance if it doesn't exist
-    if (!sfc) {
-        sfc = new SequentialFunctionBlocks(this);
+    // Prevent recursive calls
+    if (isLoading) {
+        ESP_LOGW(TAG, "Already loading SFC, ignoring recursive call");
+        return ErrorCode::FILE_SYSTEM_ERROR;
     }
     
-    // Load the SFC from file without try-catch since exceptions are disabled
+    isLoading = true;
+    
+    // Delete existing SFC instance completely
+    if (sfc) {
+        ESP_LOGI(TAG, "Deleting existing SFC instance");
+        delete sfc;
+        sfc = nullptr;
+    }
+    
+    // Create a fresh SFC instance
+    sfc = new SequentialFunctionBlocks(this);
+    ESP_LOGI(TAG, "Created new SFC instance");
+    
+    // Load the SFC from file
     ErrorCode result = sfc->LoadSfcFromFile(path);
     
     if (result == ErrorCode::OK) {
         ESP_LOGI(TAG, "SFC loaded successfully");
+        experimentMode = ExperimentMode::sequential_functionblock;
     } else {
         ESP_LOGE(TAG, "Failed to load SFC, error code: %d", static_cast<int>(result));
+        // Clean up on failure
+        delete sfc;
+        sfc = nullptr;
     }
     
+    isLoading = false;
     return result;
 }
 
@@ -202,6 +221,10 @@ void DeviceManager::EternalLoop(){
         ESP_LOGW(TAG, "No defaultfbd.fbd found. Continuing with factory dummy fbd");
     }
     hal->GreetUserOnStartup();
+    
+    if(this->LoadSfcFromFile(DEFAULTSFC_FILEPATH)!=ErrorCode::OK){
+        ESP_LOGW(TAG, "No default SFC found. Continuing without SFC");
+    }
 
     ESP_LOGD(TAG, "devicemanager main loop starts");
     while (true)
@@ -566,13 +589,9 @@ ErrorCode DeviceManager::Loop()
                 ms_delta = 1;
         }
         lastSfcTickMs = nowMsSteady;
-        if (IsSfcLoaded())
-        {
-            TickSfc(ms_delta); // oder die gewünschte ms-Rate
-        }else
-        {
-            LoadSfcFromFile(DEFAULTSFC_FILEPATH);
-        }
+    
+        TickSfc(ms_delta); // oder die gewünschte ms-Rate
+       
     }
     else if(experimentMode==ExperimentMode::openloop_heater){
         heaterPIDController->SetMode(PID::Mode::OFF, nowMsSteady);
@@ -692,5 +711,27 @@ ErrorCode DeviceManager::TriggerHeaterExperiment(const heaterexperiment::Request
         )
     );
     return ErrorCode::OK;
+}
+
+void DeviceManager::UnloadSfc() {
+    // Set experiment mode to function block first
+    experimentMode = ExperimentMode::functionblock;
+    
+    // TO-DO: Reseting of hardware Booleans, Connections etc. 
+
+    // Delete SFC instance if it exists
+    if (sfc) {
+        ESP_LOGI(TAG, "Unloading SFC instance");
+        delete sfc;
+        sfc = nullptr;
+        
+        // Reset timing variables
+        lastSfcTickMs = 0;
+        ms_delta = 0.0001;
+        
+        ESP_LOGI(TAG, "SFC unloaded successfully");
+    } else {
+        ESP_LOGW(TAG, "No SFC instance to unload");
+    }
 }
 

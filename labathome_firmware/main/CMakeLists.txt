@@ -8,6 +8,7 @@ idf_component_register(
         "devicemanager.cc" 
         "main.cc"
         "sfc/sfc_adapter.cc"
+        "sfc/sfcParser.cc"
         "sfc/sequentialfunctionblock.cc"
         ${MICROSFC_SOURCES}  # Add microsfc source files
     INCLUDE_DIRS 

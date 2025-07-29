@@ -162,6 +162,7 @@ class DeviceManager:public FBContext
         bool IsSfcLoaded() const;
         void TickSfc(uint32_t ms);
         ErrorCode LoadSfcFromFile(const char *path);
+        void UnloadSfc();
         //SFC Ende
 
  

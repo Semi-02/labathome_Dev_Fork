@@ -156,4 +156,25 @@ component_context_t * Application::getContext() {
 	return &(this->container_context);
 }
 
+void Application::shutdown() {
+    ESP_LOGI("SFC_APP", "=== APPLICATION SHUTDOWN STARTED ===");
+    
+    evaluate = false;
+    
+    if (this->getState()->activated) {
+        this->getState()->activated = false;
+
+        ESP_LOGI("SFC_APP", "Application state deactivated");
+    }
+    
+    if (this->getState()->active) {
+		this->getState()->active = false;
+        ESP_LOGI("SFC_APP", "Deactivation sequence completed");
+    }
+    
+    clear();
+    
+    ESP_LOGI("SFC_APP", "=== APPLICATION SHUTDOWN COMPLETE ===");
+}
+
 } /* namespace sfc */

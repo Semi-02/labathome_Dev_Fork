@@ -19,6 +19,7 @@ public:
 
     ErrorCode LoadSfcFromFile(const char* filepath);
     void Tick(uint32_t ms);
-    bool IsInitialized() const { return initialized; }
-    void Reset();
+    bool IsInitialized() const { 
+        return initialized && adapter && adapter->IsInitialized(); 
+    }
 };

@@ -14,7 +14,7 @@
         },
         {
           "codeUid": "act1_2",
-          "caption": "Timer1Flag setzen nach Verzögerung",
+          "caption": "Timer1Flag setzen nach Verzoegerung",
           "targetBoolean": "Timer1Flag",
           "qualifier": "D",
           "ms_time": 500
@@ -51,7 +51,7 @@
         },
         {
           "codeUid": "act2_2",
-          "caption": "Timer2Flag setzen nach Verzögerung",
+          "caption": "Timer2Flag setzen nach Verzoegerung",
           "targetBoolean": "Timer2Flag",
           "qualifier": "D",
           "ms_time": 500
