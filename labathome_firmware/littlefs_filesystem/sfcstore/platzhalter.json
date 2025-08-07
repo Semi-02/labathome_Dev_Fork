@@ -1,0 +1,76 @@
+{
+  "start": "step1",
+  "steps": [
+    {
+      "uid": "step1",
+      "caption": "Platzhalter",
+      "actions": [
+        {
+          "codeUid": "A-1754583818460",
+          "caption": "Platzhalter",
+          "targetBoolean": "newBoolean",
+          "qualifier": "N",
+          "ms_time": 0
+        }
+      ],
+      "outgoingTransitions": [
+        {
+          "type": "simple",
+          "condition": [
+            "LeiderVoll == true"
+          ],
+          "sourceDone": [
+            true
+          ],
+          "source": [
+            "step1"
+          ],
+          "target": [
+            "step-1754583813114"
+          ]
+        }
+      ]
+    },
+    {
+      "uid": "step-1754583813114",
+      "caption": "New Step",
+      "actions": [
+        {
+          "codeUid": "A-1754583823599",
+          "caption": "haltPlatzer",
+          "targetBoolean": "newBoolean",
+          "qualifier": "N",
+          "ms_time": 0
+        }
+      ],
+      "outgoingTransitions": [
+        {
+          "type": "simple",
+          "condition": [
+            "KeinPlatz == true"
+          ],
+          "sourceDone": [
+            true
+          ],
+          "source": [
+            "step-1754583813114"
+          ],
+          "target": [
+            "step1"
+          ]
+        }
+      ]
+    }
+  ],
+  "booleans": {
+    "hardware": {
+      "Red_LED": false,
+      "Yellow_LED": false,
+      "Green_LED": false
+    },
+    "custom": {
+      "KeinPlatz": false,
+      "LeiderVoll": false
+    }
+  }
+}
