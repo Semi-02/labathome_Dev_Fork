@@ -98,6 +98,7 @@ SfcAdapter::~SfcAdapter() {
     intVarMap.clear();
     floatVarMap.clear();
     
+    storedActionsByVar.clear();
     ESP_LOGI(SFC_TAG, "SfcAdapter destructor completed successfully");
 }
 
@@ -196,6 +197,19 @@ void SfcAdapter::UpdateHardware() {
     //              static_cast<unsigned long>(timer->getPeriod() ? *timer->getPeriod() : 0));
     //     timerIdx++;
     // }
+}
+
+void SfcAdapter::ResetStoredActionsFor(const std::string& name) {
+    auto it = storedActionsByVar.find(name);
+    if (it == storedActionsByVar.end()) return;
+
+    for (auto* act : it->second) {
+        if (!act) continue;
+        // Deactivate and fully clear so the next step activation triggers ACTIVATING again
+        act->shutdown();
+        act->clear();
+        ESP_LOGI(SFC_TAG, "Re-armed stored action for '%s'", name.c_str());
+    }
 }
 
 void SfcAdapter::SetBoolVar(const std::string& name, bool value) {

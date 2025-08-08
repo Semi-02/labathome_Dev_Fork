@@ -28,14 +28,16 @@ sfc::predicate_fnc SfcAdapter::CreatePredicate(const char* condition) {
         
         bool expectedValue = (valueStr == "true");
         
-        return [this, varName, expectedValue]() -> bool {
+        return [this, varName, expectedValue, condStr]() -> bool {
+            ESP_LOGE(SFC_TAG, "Evaluating predicate: %s", condStr.c_str());
             auto it = boolVarMap.find(varName);
             if (it == boolVarMap.end()) {
                 ESP_LOGE(SFC_TAG, "Variable not found in boolean map");
                 return false;
             }
-            
-            return it->second == expectedValue;
+            bool result = it->second == expectedValue;
+            ESP_LOGE(SFC_TAG, "Predicate result: %s", result ? "true" : "false");
+            return result;
         };
     } 
     else if (condStr.find("!=") != std::string::npos) {
@@ -51,14 +53,16 @@ sfc::predicate_fnc SfcAdapter::CreatePredicate(const char* condition) {
         
         bool expectedValue = (valueStr == "true");
         
-        return [this, varName, expectedValue]() -> bool {
+        return [this, varName, expectedValue, condStr]() -> bool {
+            ESP_LOGE(SFC_TAG, "Evaluating predicate: %s", condStr.c_str());
             auto it = boolVarMap.find(varName);
             if (it == boolVarMap.end()) {
-                ESP_LOGE(SFC_TAG, "Variable  not found in boolean map");
+                ESP_LOGE(SFC_TAG, "Variable not found in boolean map");
                 return false;
             }
-            
-            return it->second != expectedValue;
+            bool result = it->second != expectedValue;
+            ESP_LOGE(SFC_TAG, "Predicate result: %s", result ? "true" : "false");
+            return result;
         };
     }
     
@@ -79,6 +83,7 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
     boolVarMap.clear();
     intVarMap.clear();
     floatVarMap.clear();
+    storedActionsByVar.clear(); // added
 
     // 1. Parse boolean variables
     cJSON* booleans = cJSON_GetObjectItem(root, "booleans");
@@ -129,7 +134,7 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
         steps.push_back(sfc::Step(isEntryPoint));
         stepUidToIndex[stepUid] = stepIndex++;
     }
-
+    
     // 3. Parse actions
     stepIndex = 0;
     cJSON_ArrayForEach(step, stepsArray) {
@@ -144,7 +149,7 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
             cJSON* targetBool = cJSON_GetObjectItem(actionItem, "targetBoolean");
             cJSON* qualifier = cJSON_GetObjectItem(actionItem, "qualifier");
             cJSON* ms_time = cJSON_GetObjectItem(actionItem, "ms_time");
-            int msTime = (ms_time && cJSON_IsNumber(ms_time)) ? ms_time->valueint : 0;
+            sfc::time_t msTime = (ms_time && cJSON_IsNumber(ms_time)) ? static_cast<sfc::time_t>(ms_time->valuedouble) : 0;
 
             if (!targetBool || !cJSON_IsString(targetBool) || 
                 !qualifier || !cJSON_IsString(qualifier)) {
@@ -154,157 +159,211 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
             std::string targetBoolName = targetBool->valuestring;
             std::string qualifierStr = qualifier->valuestring;
             sfc::Action* action = nullptr;
-            // TODO : Check if generating Actions would be better with a factory method
+
+            auto pushHandlers = [&](std::vector<sfc::state_handler_t>& handlers) {
+                allHandlerArrays.push_back(std::move(handlers));
+                return sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size());
+            };
+
+            // N: Non-stored
             if (qualifierStr == "N") {
-                allHandlerArrays.push_back({
+                std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "N: ACTIVATING '%s'", targetBoolName.c_str());
+                        this->SetBoolVar(targetBoolName, true);
+                    }},
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName](const sfc::stateful_state_t&) {
                         this->SetBoolVar(targetBoolName, true);
                     }},
                     { ACTION_STATE_DEACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "N: DEACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
-                    }}
-                });
-                action = new sfc::NonStoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                    }},
+                    { ACTION_STATE_INACTIVE, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, false);
+                    }},
+                };
+                action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
+            // R: Reset – also re-arm stored S actions for same boolean
             else if (qualifierStr == "R") {
-                allHandlerArrays.push_back({
+                std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "R: ACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
-                    }}
-                });
-                action = new sfc::StoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                        this->ResetStoredActionsFor(targetBoolName);
+                    }},
+                    { ACTION_STATE_ACTIVE, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                };
+                action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
+            // S: Stored – set once on step activation; remains active until reset
             else if (qualifierStr == "S") {
-                allHandlerArrays.push_back({
+                std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "S: ACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, true);
-                    }}
-                });
-                action = new sfc::StoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                    }},
+                    { ACTION_STATE_ACTIVE, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                };
+                action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
+                // Track S action so R can re-arm it
+                storedActionsByVar[targetBoolName].push_back(action);
             }
+            // L  time Limited (Non-stored): true immediately, off at expiry or deactivation
             else if (qualifierStr == "L" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-                
-                // Create a safer handler that checks timer validity
-                allHandlerArrays.push_back({
-                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        if (timerPtr && timerPtr->getState()) {  // Add safety check
+
+                std::vector<sfc::state_handler_t> handlers = {
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr, msTime](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "L: ACTIVATING '%s' t=%lu ms", targetBoolName.c_str(), (unsigned long)msTime);
+                        if (timerPtr && timerPtr->getState()) {
                             this->SetBoolVar(targetBoolName, true);
                             timerPtr->enable();
                         }
                     }},
-                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        if (timerPtr && timerPtr->getState()) {  // Add safety check
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            ESP_LOGE(SFC_TAG, "L: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, false);
-                            timerPtr->disable();
                         }
-                    }}
-                });
-                action = new sfc::NonStoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "L: DEACTIVATING '%s'", targetBoolName.c_str());
+                        this->SetBoolVar(targetBoolName, false);
+                        if (timerPtr && timerPtr->getState()) timerPtr->disable();
+                    }},
+                    { ACTION_STATE_INACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        // keep clean when inactive
+                        this->SetBoolVar(targetBoolName, false);
+                        if (timerPtr && timerPtr->getState()) timerPtr->disable();
+                    }},
+                };
+                action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
+            // D  time Delayed (Non-stored): set true after delay if still active; off on deactivation
             else if (qualifierStr == "D" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-                allHandlerArrays.push_back({
-                    { ACTION_STATE_ACTIVATING, [timerPtr](const sfc::stateful_state_t&) {
-                        timerPtr->enable();
+
+                std::vector<sfc::state_handler_t> handlers = {
+                    { ACTION_STATE_ACTIVATING, [timerPtr, msTime](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "D: ACTIVATING t=%lu ms", (unsigned long)msTime);
+                        if (timerPtr && timerPtr->getState()) timerPtr->enable();
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        if (timerPtr->getState()->interrupted)
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            ESP_LOGE(SFC_TAG, "D: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, true);
+                        }
                     }},
                     { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "D: DEACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
-                        timerPtr->disable();
-                    }}
-                });
-                action = new sfc::NonStoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                        if (timerPtr && timerPtr->getState()) timerPtr->disable();
+                    }},
+                    { ACTION_STATE_INACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, false);
+                        if (timerPtr && timerPtr->getState()) timerPtr->disable();
+                    }},
+                };
+                action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
+            // P  Pulse (Non-stored): toggle on activating and deactivating only
             else if (qualifierStr == "P") {
-                allHandlerArrays.push_back({
+                std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "P: ACTIVATING '%s'", targetBoolName.c_str());
                         bool current = this->GetBoolVar(targetBoolName);
                         this->SetBoolVar(targetBoolName, !current);
                     }},
+                    { ACTION_STATE_ACTIVE, [](const sfc::stateful_state_t&) {}},
                     { ACTION_STATE_DEACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "P: DEACTIVATING '%s'", targetBoolName.c_str());
                         bool current = this->GetBoolVar(targetBoolName);
                         this->SetBoolVar(targetBoolName, !current);
-                    }}
-                });
-                action = new sfc::NonStoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                    }},
+                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                };
+                action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
+            // SD Stored & Delayed (Stored): set true after delay; persists until reset
             else if (qualifierStr == "SD" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-                allHandlerArrays.push_back({
-                    { ACTION_STATE_ACTIVATING, [timerPtr](const sfc::stateful_state_t&) {
-                        timerPtr->enable();
+
+                std::vector<sfc::state_handler_t> handlers = {
+                    { ACTION_STATE_ACTIVATING, [timerPtr, msTime](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "SD: ACTIVATING t=%lu ms", (unsigned long)msTime);
+                        if (timerPtr && timerPtr->getState()) timerPtr->enable();
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        if (timerPtr->getState()->interrupted)
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            ESP_LOGE(SFC_TAG, "SD: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, true);
-                    }}
-                });
-                action = new sfc::StoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                        }
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                };
+                action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
+
+                storedActionsByVar[targetBoolName].push_back(action);
             }
+            // DS Delayed & Stored (Stored): set true after delay if step still active at expiry (best-effort)
             else if (qualifierStr == "DS" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-                allHandlerArrays.push_back({
-                    { ACTION_STATE_ACTIVATING, [timerPtr](const sfc::stateful_state_t&) {
-                        timerPtr->enable();
+
+                std::vector<sfc::state_handler_t> handlers = {
+                    { ACTION_STATE_ACTIVATING, [timerPtr, msTime](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "DS: ACTIVATING t=%lu ms", (unsigned long)msTime);
+                        if (timerPtr && timerPtr->getState()) timerPtr->enable();
                     }},
-                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        if (timerPtr->getState()->interrupted)
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t& actionState) {
+                        // Best-effort: only set if action is still active when timer expires.
+                        if (actionState.active && timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            ESP_LOGE(SFC_TAG, "DS: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, true);
-                    }}
-                });
-                action = new sfc::StoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                        }
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                };
+                action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
+                storedActionsByVar[targetBoolName].push_back(action);
             }
+            // SL Stored & Limited (Stored): true immediately, false at expiry; can be reset
             else if (qualifierStr == "SL" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-                allHandlerArrays.push_back({
-                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        this->SetBoolVar(targetBoolName, true);
-                        timerPtr->enable();
+
+                std::vector<sfc::state_handler_t> handlers = {
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr, msTime](const sfc::stateful_state_t&) {
+                        ESP_LOGE(SFC_TAG, "SL: ACTIVATING '%s' t=%lu ms", targetBoolName.c_str(), (unsigned long)msTime);
+                        if (timerPtr && timerPtr->getState()) {
+                            this->SetBoolVar(targetBoolName, true);
+                            timerPtr->enable();
+                        }
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        if (timerPtr->getState()->interrupted)
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            ESP_LOGE(SFC_TAG, "SL: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, false);
-                    }}
-                });
-                action = new sfc::StoredAction(
-                    stepIndex,
-                    sfc::arrayof(allHandlerArrays.back().data(), allHandlerArrays.back().size())
-                );
+                        }
+                    }},
+                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                };
+                action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
+                storedActionsByVar[targetBoolName].push_back(action);
             }
-
+    
             if (action) {
                 actions.push_back(action);
             }

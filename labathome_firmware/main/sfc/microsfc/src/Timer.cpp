@@ -18,20 +18,20 @@ limitations under the License.
 namespace sfc {
 
 Timer::Timer() {
-	this->period = period;
-	this->continous = continous;
-	this->timer_state = { 0, false, false };
-	this->interrupt_callback = 0;
+    this->period = 0;
+    this->continous = false;
+    this->timer_state = { 0, false, false };
+    this->interrupt_callback = nullptr;
 }
 
 Timer::~Timer() {
 }
 
 Timer::Timer(const time_t &period, const bool &continous, timer_interrupt_callback_t interrput_callback) {
-	this->period = period;
-	this->continous = continous;
-	this->timer_state = {0, false, false};
-	this->interrupt_callback = interrupt_callback;
+    this->period = period;
+    this->continous = continous;
+    this->timer_state = {0, false, false};
+    this->interrupt_callback = interrput_callback;
 }
 
 Timer::Timer(const time_t &period, const bool &continous) {
@@ -66,10 +66,10 @@ void Timer::onTick(const sfc::time_t &delta) {
 }
 
 void Timer::enable() {
-	if (!(this->timer_state.enabled = true)) {
-		this->reset();
-		this->timer_state.enabled = true;
-	}
+    if (!this->timer_state.enabled) {
+        this->reset();
+        this->timer_state.enabled = true;
+    }
 }
 void Timer::reset() {
 	this->timer_state.current_time = 0l;

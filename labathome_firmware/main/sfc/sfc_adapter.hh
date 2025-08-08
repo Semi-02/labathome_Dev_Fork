@@ -30,12 +30,18 @@ private:
     std::vector<std::vector<sfc::state_handler_t>> allHandlerArrays;
     std::vector<std::unique_ptr<sfc::Timer>> timers;
 
+    // Map target boolean -> all stored "S" actions affecting it
+    std::map<std::string, std::vector<sfc::Action*>> storedActionsByVar;
+
     sfc::predicate_fnc CreatePredicate(const char* condition);
     ErrorCode ParseJson(cJSON* root);
     cJSON* LoadFile(const char* path);
 
     void UpdateHardware();
     ErrorCode InitializeApplication();
+
+    // Reset/re-arm stored actions for this boolean so they can activate again later
+    void ResetStoredActionsFor(const std::string& name);
   
 public:
     std::map<std::string, bool> boolVarMap;
