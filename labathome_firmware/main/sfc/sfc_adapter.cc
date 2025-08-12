@@ -20,11 +20,11 @@
 #include "microsfc/include/StoredAction.h"
 
 //Qualifier:
-// N  Non-stored               The action is active as long as the step.
-// R  overriding Reset         The action is deactivated.
-// S  Set (Stored)             executes this action as soon as the step is active. The action execution is continued even when the step has been deactivated until it gets a reset.
+//x N  Non-stored               The action is active as long as the step.
+//x R  overriding Reset         The action is deactivated.
+//x S  Set (Stored)             executes this action as soon as the step is active. The action execution is continued even when the step has been deactivated until it gets a reset.
 // L  time Limited             executes this action as soon as the step is active. The action is executed until the step is deactivated or the given time span has elapsed.
-// D  time Delayed             starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until the step is deactivated.
+//x D  time Delayed             starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until the step is deactivated.
 // P  Pulse                    executes the action exactly two times: one time when the step is activated and one time when the step is deactivated.
 // SD Stored and time Delayed  starts executing the action only after the given delay time has elapsed following step activation. The action is executed until it gets a reset.
 // DS Delayed and Stored       starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until it gets a reset.
@@ -38,25 +38,21 @@ SfcAdapter::SfcAdapter(DeviceManager* deviceManager)
     redLightVar = "Red_LED";
     yellowLightVar = "Yellow_LED";
     greenLightVar = "Green_LED";
+    redButtonVar = "Red_Button";
+    greenButtonVar = "Green_Button";
 }
 
 SfcAdapter::~SfcAdapter() {
     ESP_LOGI(SFC_TAG, "SfcAdapter destructor called - freeing all resources");
-    
-    // First mark as uninitialized to prevent further processing
+
     initialized = false;
     
-    // Shutdown and delete application
     if (application) {
-        ESP_LOGI(SFC_TAG, "Shutting down application");
         application->shutdown();
         delete application;
         application = nullptr;
-        ESP_LOGI(SFC_TAG, "Application deleted");
     }
     
-    // Disable and clear timers
-    ESP_LOGI(SFC_TAG, "Clearing timers");
     for (auto& timer : timers) {
         if (timer) {
             timer->disable();
@@ -64,8 +60,7 @@ SfcAdapter::~SfcAdapter() {
     }
     timers.clear();
     
-    // Delete actions
-    ESP_LOGI(SFC_TAG, "Deleting actions");
+
     for (auto* action : actions) {
         if (action) {
             delete action;
@@ -99,7 +94,7 @@ SfcAdapter::~SfcAdapter() {
     floatVarMap.clear();
     
     storedActionsByVar.clear();
-    ESP_LOGI(SFC_TAG, "SfcAdapter destructor completed successfully");
+    ESP_LOGI(SFC_TAG, "SfcAdapter destructor end");
 }
 
 ErrorCode SfcAdapter::LoadFromFile(const char* path) {
@@ -144,15 +139,26 @@ ErrorCode SfcAdapter::ExecuteCycle(uint32_t ms)
         return ErrorCode::NOT_YET_INITIALIZED;
     }
 
+    ReadHardware();
+
     for (auto& timer : timers) {
         timer->onTick(ms);
-        
-    }
-    ESP_LOGI(SFC_TAG, "SFC TICK");  
+    } 
     application->onTick(ms);
+
     UpdateHardware();
 
     return ErrorCode::OK;
+}
+
+void SfcAdapter::ReadHardware() {
+    auto hal = deviceManager->GetHAL();
+    
+    bool redButtonPressed = hal->GetButtonRedIsPressed();
+    SetBoolVar(redButtonVar, redButtonPressed);
+    
+    bool greenButtonPressed = hal->GetButtonGreenIsPressed();
+    SetBoolVar(greenButtonVar, greenButtonPressed);
 }
 
 void SfcAdapter::UpdateHardware() {
@@ -170,33 +176,6 @@ void SfcAdapter::UpdateHardware() {
     bool green = GetBoolVar(greenLightVar);
     hal->ColorizeLed(2, green ? CRGB::DarkGreen : CRGB::Black);
 
-    // Debug output
-    // ESP_LOGI(SFC_TAG, "LED states:");
-    // ESP_LOGI(SFC_TAG, "Red LED state: %s", red ? "ON" : "OFF");
-    // ESP_LOGI(SFC_TAG, "Yellow LED state: %s", yellow ? "ON" : "OFF");
-    // ESP_LOGI(SFC_TAG, "Green LED state: %s", green ? "ON" : "OFF");
-
-    // Booleans
-    // ESP_LOGI(SFC_TAG, "Boolean states:");
-    // for (const auto &pair : boolVarMap)
-    // {
-    //     ESP_LOGI(SFC_TAG, "%s: %s", pair.first.c_str(), pair.second ? "true" : "false");
-    // }
-
-    // Timers
-    // ESP_LOGI(SFC_TAG, "Timer states:");
-    // int timerIdx = 0;
-    // for (const auto &timer : timers)
-    // {
-    //     auto *state = timer->getState();
-    //     ESP_LOGI(SFC_TAG, "Timer %d: enabled: %s, interrupted: %s, elapsed: %lu ms / %lu ms",
-    //              timerIdx,
-    //              state->enabled ? "true" : "false",
-    //              state->interrupted ? "true" : "false",
-    //              static_cast<unsigned long>(state->current_time),
-    //              static_cast<unsigned long>(timer->getPeriod() ? *timer->getPeriod() : 0));
-    //     timerIdx++;
-    // }
 }
 
 void SfcAdapter::ResetStoredActionsFor(const std::string& name) {
@@ -205,7 +184,7 @@ void SfcAdapter::ResetStoredActionsFor(const std::string& name) {
 
     for (auto* act : it->second) {
         if (!act) continue;
-        // Deactivate and fully clear so the next step activation triggers ACTIVATING again
+        
         act->shutdown();
         act->clear();
         ESP_LOGI(SFC_TAG, "Re-armed stored action for '%s'", name.c_str());
@@ -234,7 +213,7 @@ bool SfcAdapter::IsInitialized() const {
     return initialized && application != nullptr;
 }
 
-// Hilfsfunktion zum Einlesen und Parsen der Datei zu json
+
 cJSON* SfcAdapter::LoadFile(const char* path) {
     FILE* file = fopen(path, "r");
     if (!file) {

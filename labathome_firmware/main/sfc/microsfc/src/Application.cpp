@@ -162,14 +162,11 @@ void Application::shutdown() {
     evaluate = false;
     
     if (this->getState()->activated) {
-        this->getState()->activated = false;
-
-        ESP_LOGI("SFC_APP", "Application state deactivated");
+        this->getState()->activated = false; 
     }
     
     if (this->getState()->active) {
 		this->getState()->active = false;
-        ESP_LOGI("SFC_APP", "Deactivation sequence completed");
     }
     
     clear();

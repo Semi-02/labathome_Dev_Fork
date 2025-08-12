@@ -19,6 +19,8 @@ private:
     std::string redLightVar;
     std::string yellowLightVar;
     std::string greenLightVar;
+    std::string redButtonVar;
+    std::string greenButtonVar;
     bool hasLedMapping;
     bool initialized;
     std::vector<sfc::Action*> actions;
@@ -37,6 +39,7 @@ private:
     ErrorCode ParseJson(cJSON* root);
     cJSON* LoadFile(const char* path);
 
+    void ReadHardware();  
     void UpdateHardware();
     ErrorCode InitializeApplication();
 
