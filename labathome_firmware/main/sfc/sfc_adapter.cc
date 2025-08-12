@@ -23,12 +23,12 @@
 //x N  Non-stored               The action is active as long as the step.
 //x R  overriding Reset         The action is deactivated.
 //x S  Set (Stored)             executes this action as soon as the step is active. The action execution is continued even when the step has been deactivated until it gets a reset.
-// L  time Limited             executes this action as soon as the step is active. The action is executed until the step is deactivated or the given time span has elapsed.
+//x L  time Limited             executes this action as soon as the step is active. The action is executed until the step is deactivated or the given time span has elapsed.
 //x D  time Delayed             starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until the step is deactivated.
-// P  Pulse                    executes the action exactly two times: one time when the step is activated and one time when the step is deactivated.
-// SD Stored and time Delayed  starts executing the action only after the given delay time has elapsed following step activation. The action is executed until it gets a reset.
-// DS Delayed and Stored       starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until it gets a reset.
-// SL Stored and time limited  executes this action as soon as the step is activated. It is executed until the specified time has elapsed or it gets a reset.</p></td></tr>
+//x P  Pulse                    executes the action exactly two times: one time when the step is activated and one time when the step is deactivated.
+//x SD Stored and time Delayed  starts executing the action only after the given delay time has elapsed following step activation. The action is executed until it gets a reset.
+//x DS Delayed and Stored       starts executing the action only after the given delay time has elapsed following step activation and the step is still active. The action is executed until it gets a reset.
+// SL Stored and time limited  executes this action as soon as the step is activated. It is executed until the specified time has elapsed or it gets a reset.
 
 
 SfcAdapter::SfcAdapter(DeviceManager* deviceManager)
@@ -239,4 +239,12 @@ cJSON* SfcAdapter::LoadFile(const char* path) {
     free(buffer);
 
     return root;
+}
+
+bool SfcAdapter::IsStepActive(size_t stepIndex) const {
+    if (!application) return false;
+    
+    // Get the step state from the application
+    const sfc::stateful_state_t& stepState = application->getStepState(stepIndex);
+    return stepState.active;
 }

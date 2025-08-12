@@ -29,14 +29,12 @@ sfc::predicate_fnc SfcAdapter::CreatePredicate(const char* condition) {
         bool expectedValue = (valueStr == "true");
         
         return [this, varName, expectedValue, condStr]() -> bool {
-            ESP_LOGE(SFC_TAG, "Evaluating predicate: %s", condStr.c_str());
             auto it = boolVarMap.find(varName);
             if (it == boolVarMap.end()) {
                 ESP_LOGE(SFC_TAG, "Variable not found in boolean map");
                 return false;
             }
             bool result = it->second == expectedValue;
-            ESP_LOGE(SFC_TAG, "Predicate result: %s", result ? "true" : "false");
             return result;
         };
     } 
@@ -54,18 +52,15 @@ sfc::predicate_fnc SfcAdapter::CreatePredicate(const char* condition) {
         bool expectedValue = (valueStr == "true");
         
         return [this, varName, expectedValue, condStr]() -> bool {
-            ESP_LOGE(SFC_TAG, "Evaluating predicate: %s", condStr.c_str());
             auto it = boolVarMap.find(varName);
             if (it == boolVarMap.end()) {
                 ESP_LOGE(SFC_TAG, "Variable not found in boolean map");
                 return false;
             }
             bool result = it->second != expectedValue;
-            ESP_LOGE(SFC_TAG, "Predicate result: %s", result ? "true" : "false");
             return result;
         };
     }
-    
     ESP_LOGE(SFC_TAG, "Unsupported condition format");
     return []() -> bool { return false; };
 }
@@ -169,14 +164,12 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
             if (qualifierStr == "N") {
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "N: ACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, true);
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName](const sfc::stateful_state_t&) {
                         this->SetBoolVar(targetBoolName, true);
                     }},
                     { ACTION_STATE_DEACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "N: DEACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
                     }},
                     { ACTION_STATE_INACTIVE, [this, targetBoolName](const sfc::stateful_state_t&) {
@@ -189,7 +182,6 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
             else if (qualifierStr == "R") {
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "R: ACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
                         this->ResetStoredActionsFor(targetBoolName);
                     }},
@@ -203,7 +195,6 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
             else if (qualifierStr == "S") {
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "S: ACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, true);
                     }},
                     { ACTION_STATE_ACTIVE, [](const sfc::stateful_state_t&) {}},
@@ -221,7 +212,6 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
 
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr, msTime](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "L: ACTIVATING '%s' t=%lu ms", targetBoolName.c_str(), (unsigned long)msTime);
                         if (timerPtr && timerPtr->getState()) {
                             this->SetBoolVar(targetBoolName, true);
                             timerPtr->enable();
@@ -229,17 +219,14 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
                         if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
-                            ESP_LOGE(SFC_TAG, "L: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, false);
                         }
                     }},
                     { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "L: DEACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
                         if (timerPtr && timerPtr->getState()) timerPtr->disable();
                     }},
                     { ACTION_STATE_INACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        // keep clean when inactive
                         this->SetBoolVar(targetBoolName, false);
                         if (timerPtr && timerPtr->getState()) timerPtr->disable();
                     }},
@@ -253,17 +240,14 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
 
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [timerPtr, msTime](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "D: ACTIVATING t=%lu ms", (unsigned long)msTime);
                         if (timerPtr && timerPtr->getState()) timerPtr->enable();
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
                         if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
-                            ESP_LOGE(SFC_TAG, "D: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, true);
                         }
                     }},
                     { ACTION_STATE_DEACTIVATING, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "D: DEACTIVATING '%s'", targetBoolName.c_str());
                         this->SetBoolVar(targetBoolName, false);
                         if (timerPtr && timerPtr->getState()) timerPtr->disable();
                     }},
@@ -274,21 +258,35 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
                 };
                 action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
-            // P  Pulse (Non-stored): toggle on activating and deactivating only
+             // P  Pulse (Non-stored): toggle on activating and deactivating only
             else if (qualifierStr == "P") {
+                timers.push_back(std::make_unique<sfc::Timer>(100, false));
+                sfc::Timer* activateTimerPtr = timers.back().get();
+                
+                timers.push_back(std::make_unique<sfc::Timer>(100, false));
+                sfc::Timer* deactivateTimerPtr = timers.back().get();
+            
                 std::vector<sfc::state_handler_t> handlers = {
-                    { ACTION_STATE_ACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "P: ACTIVATING '%s'", targetBoolName.c_str());
-                        bool current = this->GetBoolVar(targetBoolName);
-                        this->SetBoolVar(targetBoolName, !current);
+                    { ACTION_STATE_ACTIVATING, [this, targetBoolName, activateTimerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, true);
+                        if (activateTimerPtr && activateTimerPtr->getState()) activateTimerPtr->enable();
                     }},
-                    { ACTION_STATE_ACTIVE, [](const sfc::stateful_state_t&) {}},
-                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "P: DEACTIVATING '%s'", targetBoolName.c_str());
-                        bool current = this->GetBoolVar(targetBoolName);
-                        this->SetBoolVar(targetBoolName, !current);
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, activateTimerPtr](const sfc::stateful_state_t&) {
+                        if (activateTimerPtr && activateTimerPtr->getState() && activateTimerPtr->getState()->interrupted) {
+                            this->SetBoolVar(targetBoolName, false);
+                            activateTimerPtr->disable();
+                        }
                     }},
-                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_DEACTIVATING, [this, targetBoolName, deactivateTimerPtr](const sfc::stateful_state_t&) {
+                        this->SetBoolVar(targetBoolName, true);
+                        if (deactivateTimerPtr && deactivateTimerPtr->getState()) deactivateTimerPtr->enable();
+                    }},
+                    { ACTION_STATE_INACTIVE, [this, targetBoolName, deactivateTimerPtr](const sfc::stateful_state_t&) {
+                        if (deactivateTimerPtr && deactivateTimerPtr->getState() && deactivateTimerPtr->getState()->interrupted) {
+                            this->SetBoolVar(targetBoolName, false);
+                            deactivateTimerPtr->disable();
+                        }
+                    }},
                 };
                 action = new sfc::NonStoredAction(stepIndex, pushHandlers(handlers));
             }
@@ -299,37 +297,39 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
 
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [timerPtr, msTime](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "SD: ACTIVATING t=%lu ms", (unsigned long)msTime);
                         if (timerPtr && timerPtr->getState()) timerPtr->enable();
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
                         if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
-                            ESP_LOGE(SFC_TAG, "SD: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, true);
                         }
                     }},
                     { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
-                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_INACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            this->SetBoolVar(targetBoolName, true);
+                        }
+                    }}
                 };
                 action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
 
                 storedActionsByVar[targetBoolName].push_back(action);
             }
-            // DS Delayed & Stored (Stored): set true after delay if step still active at expiry (best-effort)
+            // DS Delayed & Stored (Stored): set true after delay if step still active at expiry
             else if (qualifierStr == "DS" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-
+            
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [timerPtr, msTime](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "DS: ACTIVATING t=%lu ms", (unsigned long)msTime);
                         if (timerPtr && timerPtr->getState()) timerPtr->enable();
                     }},
-                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t& actionState) {
-                        // Best-effort: only set if action is still active when timer expires.
-                        if (actionState.active && timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
-                            ESP_LOGE(SFC_TAG, "DS: ACTIVE expired '%s'", targetBoolName.c_str());
-                            this->SetBoolVar(targetBoolName, true);
+                    { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr, stepIndex](const sfc::stateful_state_t&) {
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            if (this->IsStepActive(stepIndex)) {
+                                this->SetBoolVar(targetBoolName, true);
+                                timerPtr->disable();
+                            }
                         }
                     }},
                     { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
@@ -338,14 +338,13 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
                 action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
                 storedActionsByVar[targetBoolName].push_back(action);
             }
-            // SL Stored & Limited (Stored): true immediately, false at expiry; can be reset
+            // SL Stored & Limited (Stored): executes this action as soon as the step is activated. It is executed until the specified time has elapsed or it gets a reset.
             else if (qualifierStr == "SL" && msTime > 0) {
                 timers.push_back(std::make_unique<sfc::Timer>(msTime, false));
                 sfc::Timer* timerPtr = timers.back().get();
-
+            
                 std::vector<sfc::state_handler_t> handlers = {
                     { ACTION_STATE_ACTIVATING, [this, targetBoolName, timerPtr, msTime](const sfc::stateful_state_t&) {
-                        ESP_LOGE(SFC_TAG, "SL: ACTIVATING '%s' t=%lu ms", targetBoolName.c_str(), (unsigned long)msTime);
                         if (timerPtr && timerPtr->getState()) {
                             this->SetBoolVar(targetBoolName, true);
                             timerPtr->enable();
@@ -353,12 +352,22 @@ ErrorCode SfcAdapter::ParseJson(cJSON* root) {
                     }},
                     { ACTION_STATE_ACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
                         if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
-                            ESP_LOGE(SFC_TAG, "SL: ACTIVE expired '%s'", targetBoolName.c_str());
                             this->SetBoolVar(targetBoolName, false);
+                            timerPtr->disable();  
+                            this->ResetStoredActionsFor(targetBoolName);
                         }
                     }},
-                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {}},
-                    { ACTION_STATE_INACTIVE, [](const sfc::stateful_state_t&) {}},
+                    { ACTION_STATE_DEACTIVATING, [](const sfc::stateful_state_t&) {
+                        
+                    }},
+                    { ACTION_STATE_INACTIVE, [this, targetBoolName, timerPtr](const sfc::stateful_state_t&) {
+                        // Also check for timer expiration when step is inactive
+                        if (timerPtr && timerPtr->getState() && timerPtr->getState()->interrupted) {
+                            this->SetBoolVar(targetBoolName, false);
+                            timerPtr->disable();
+                            this->ResetStoredActionsFor(targetBoolName);
+                        }
+                    }},
                 };
                 action = new sfc::StoredAction(stepIndex, pushHandlers(handlers));
                 storedActionsByVar[targetBoolName].push_back(action);

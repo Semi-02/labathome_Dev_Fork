@@ -42,8 +42,6 @@ private:
     void ReadHardware();  
     void UpdateHardware();
     ErrorCode InitializeApplication();
-
-    // Reset/re-arm stored actions for this boolean so they can activate again later
     void ResetStoredActionsFor(const std::string& name);
   
 public:
@@ -59,5 +57,6 @@ public:
     void setInitalized(bool initialized);
     void SetBoolVar(const std::string& name, bool value);
     bool GetBoolVar(const std::string& name) const;
+    bool IsStepActive(size_t stepIndex) const;
  
 };
