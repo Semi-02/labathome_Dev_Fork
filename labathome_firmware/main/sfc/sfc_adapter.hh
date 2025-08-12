@@ -19,6 +19,7 @@ private:
     std::string redLightVar;
     std::string yellowLightVar;
     std::string greenLightVar;
+    std::string blueLightVar;
     std::string redButtonVar;
     std::string greenButtonVar;
     bool hasLedMapping;

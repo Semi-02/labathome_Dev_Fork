@@ -38,6 +38,7 @@ SfcAdapter::SfcAdapter(DeviceManager* deviceManager)
     redLightVar = "Red_LED";
     yellowLightVar = "Yellow_LED";
     greenLightVar = "Green_LED";
+    blueLightVar = "Blue_LED";
     redButtonVar = "Red_Button";
     greenButtonVar = "Green_Button";
 }
@@ -163,7 +164,7 @@ void SfcAdapter::ReadHardware() {
 
 void SfcAdapter::UpdateHardware() {
     auto hal = deviceManager->GetHAL();
-
+   
  
     bool red = GetBoolVar(redLightVar);
     hal->ColorizeLed(0, red ? CRGB::DarkRed : CRGB::Black);
@@ -175,6 +176,9 @@ void SfcAdapter::UpdateHardware() {
 
     bool green = GetBoolVar(greenLightVar);
     hal->ColorizeLed(2, green ? CRGB::DarkGreen : CRGB::Black);
+
+    bool blue = GetBoolVar(blueLightVar);
+    hal->ColorizeLed(3, blue ? CRGB::DarkBlue : CRGB::Black);
 
 }
 
