@@ -67,9 +67,9 @@
       "Red_LED": false,
       "Yellow_LED": false,
       "Green_LED": false,
+      "Blue_LED": false,
       "Red_Button": false,
-      "Green_Button": false,
-      "Blue_LED": false
+      "Green_Button": false
     },
     "custom": {
       "KeinPlatz": false,
