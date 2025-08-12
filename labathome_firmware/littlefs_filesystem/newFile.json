@@ -30,7 +30,8 @@
       "Yellow_LED": false,
       "Green_LED": false,
       "Red_Button": false,
-      "Green_Button": false
+      "Green_Button": false,
+      "Blue_LED": false
     },
     "custom": {
       "Timer1Flag": false
