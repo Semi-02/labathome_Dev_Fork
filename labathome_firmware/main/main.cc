@@ -1,21 +1,21 @@
-//#define HTTP
+// #define HTTP
 #define HTTPS
 
-//c++ lib incudes
+// c++ lib incudes
 #include <cstdio>
 #include <cstring>
 #include <vector>
 
-//FreeRTOS & Lwip includes
+// FreeRTOS & Lwip includes
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
 
-//opc ua include
+// opc ua include
 #include <open62541.h> // Include für die kompilierten Header
 
-//esp idf includes
+// esp idf includes
 #include <esp_system.h>
 #include <esp_log.h>
 #include <esp_littlefs.h>
@@ -33,16 +33,16 @@
 #include <esp_http_server.h>
 #endif
 
-//klaus-liebler component components
+// klaus-liebler component components
 #include <common-esp32.hh>
 #include <webmanager.hh>
 #include <runtimeconfig_cpp/runtimeconfig.hh>
 
-constexpr TickType_t xFrequency {pdMS_TO_TICKS(50)};
+constexpr TickType_t xFrequency{pdMS_TO_TICKS(50)};
 
-//board specific includes
+// board specific includes
 #include "hal_impl.hh"
-static iHAL * hal = new HAL_Impl();
+static iHAL *hal = new HAL_Impl();
 
 static const char *TAG = "main";
 #include "devicemanager.hh"
@@ -54,64 +54,49 @@ static const char *TAG = "main";
 DeviceManager *devicemanager{nullptr};
 httpd_handle_t http_server{nullptr};
 
-
-constexpr const char* NVS_PARTITION_NAME{NVS_DEFAULT_PART_NAME};
+constexpr const char *NVS_PARTITION_NAME{NVS_DEFAULT_PART_NAME};
 
 FLASH_FILE(esp32_pem_crt);
 FLASH_FILE(esp32_pem_key);
 
-// Funktion für den OPC UA-Server
-void StartOPCUAServer() {
-    UA_Server *server = UA_Server_new();
-    UA_ServerConfig *config = UA_Server_getConfig(server);
-    UA_ServerConfig_setDefault(config);
-
-    // Debug-Logs aktivieren
-    config->logger = *UA_Log_Stdout;
-    //config->logLevel = UA_LOGLEVEL_TRACE;
-
-    // Hostname explizit setzen
-    config->customHostname = UA_STRING_ALLOC("opc.tcp://192.168.4.1:4840");
-
-    // Eine Variable (Node) hinzufügen
-    UA_VariableAttributes attr = UA_VariableAttributes_default;
-    UA_Double myValue = 42.0; // Beispielwert
-    UA_Variant_setScalar(&attr.value, &myValue, &UA_TYPES[UA_TYPES_DOUBLE]);
-    attr.description = UA_LOCALIZEDTEXT((char*)"en-US", (char*)"ist in 78 Stunden.");
-    attr.displayName = UA_LOCALIZEDTEXT((char*)"en-US", (char*)"Schützenfest");
-    attr.dataType = UA_TYPES[UA_TYPES_DOUBLE].typeId;
-    attr.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
-
-    UA_NodeId myNodeId = UA_NODEID_STRING(1, (char*)"schuetzenfest");
-    UA_QualifiedName myName = UA_QUALIFIEDNAME(1, (char*)"schuetzenfest");
-    UA_NodeId parentNodeId = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
-    UA_Server_addVariableNode(server, myNodeId, parentNodeId,
-                              UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
-                              myName, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
-                              attr, nullptr, nullptr);
-
-    // Server starten
-    ESP_LOGI("OPCUA", "Starting OPC UA Server...");
-    UA_Boolean running = true;
-    UA_StatusCode retval = UA_Server_run(server, &running);
-    if (retval != UA_STATUSCODE_GOOD) {
-        ESP_LOGE("OPCUA", "Failed to start OPC UA Server: %s", UA_StatusCode_name(retval));
-    }
-
-    UA_Server_delete(server);
-}
-
 #include "open62541.h"
 
 #define OPC_UA_TAG "OPCUA"
-#define OPCUA_TASK_STACK_SIZE 16384  // 16 KB Stack für OPC UA Task
-#define OPCUA_TASK_PRIORITY   5      // Priorität im normalen Bereich
+#define OPCUA_TASK_STACK_SIZE 16384 // 16 KB Stack für OPC UA Task
+#define OPCUA_TASK_PRIORITY 5       // Priorität im normalen Bereich
 
-static void opcua_server_task(void *pvParameters) {
+static void opcua_server_task(void *pvParameters)
+{
     ESP_LOGI(OPC_UA_TAG, "Starte OPC UA Task…");
 
+    // Warten, bis IP da ist
+    //esp_netif_t *netif = nullptr;
+    esp_netif_ip_info_t ip_info{};
+    const int max_retries = 200;
+    int retries = 0;
+
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (netif != NULL)
+    {
+        esp_netif_ip_info_t ip_info;
+        if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK &&
+            ip_info.ip.addr != 0)
+        { // 0 = keine gültige IP
+            ESP_LOGI(TAG, "Station IP: " IPSTR, IP2STR(&ip_info.ip));
+        }
+        else
+        {
+            ESP_LOGW(TAG, "Keine gültige IP gefunden");
+        }
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Netif Handle für WIFI_STA_DEF nicht gefunden");
+    }
+
     UA_Server *server = UA_Server_new();
-    if(!server) {
+    if (!server)
+    {
         ESP_LOGE(OPC_UA_TAG, "Fehler beim Erstellen des OPC UA Servers");
         vTaskDelete(NULL);
         return;
@@ -120,7 +105,7 @@ static void opcua_server_task(void *pvParameters) {
     UA_ServerConfig *config = UA_Server_getConfig(server);
     UA_ServerConfig_setDefault(config);
 
-    // Beispiel: Füge eine Variable im Address Space hinzu
+    // Beispiel: Variable hinzufügen
     UA_NodeId myIntegerNodeId = UA_NODEID_STRING(1, "myInteger");
     UA_VariableAttributes attr = UA_VariableAttributes_default;
     UA_Int32 myInteger = 42;
@@ -130,33 +115,40 @@ static void opcua_server_task(void *pvParameters) {
     UA_StatusCode addStatus = UA_Server_addVariableNode(
         server,
         myIntegerNodeId,
-        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), // Parent Node: Objects folder
-        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),     // ReferenceType
-        UA_QUALIFIEDNAME(1, "MyInteger"),             // BrowseName
+        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
+        UA_QUALIFIEDNAME(1, "MyInteger"),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
         attr,
         NULL,
         NULL);
 
-    if(addStatus != UA_STATUSCODE_GOOD) {
+    if (addStatus != UA_STATUSCODE_GOOD)
+    {
         ESP_LOGE(OPC_UA_TAG, "Variable konnte nicht hinzugefügt werden: 0x%08x", (unsigned int)addStatus);
     }
 
     UA_StatusCode rc = UA_Server_run_startup(server);
-    if(rc != UA_STATUSCODE_GOOD) {
+    if (rc != UA_STATUSCODE_GOOD)
+    {
         ESP_LOGE(OPC_UA_TAG, "Startup-Fehler: 0x%08x", (unsigned int)rc);
         UA_Server_delete(server);
         vTaskDelete(NULL);
         return;
     }
 
-    ESP_LOGI(OPC_UA_TAG, "OPC UA Server läuft auf opc.tcp://<esp32-ip>:4840");
+    ESP_LOGI(OPC_UA_TAG, "OPC UA Server läuft auf opc.tcp://%s:4840", inet_ntoa(ip_info.ip));
 
-    while(true) {
-        // True = blockierend, besser bei FreeRTOS aber nicht für längere Blocking calls
-        // Besser: false + kurze Delays (oder kein Delay)
-        UA_Server_run_iterate(server, false);
-        vTaskDelay(pdMS_TO_TICKS(10)); // 10 ms Delay zum Yield
+    while (true)
+    {
+        // Iteriere nicht-blockierend
+        rc = UA_Server_run_iterate(server, false);
+        if (rc != UA_STATUSCODE_GOOD)
+        {
+            ESP_LOGW(OPC_UA_TAG, "Server Iteration Fehler: 0x%08x", (unsigned int)rc);
+        }
+        // kleines Delay, damit CPU nicht blockiert wird
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
     UA_Server_run_shutdown(server);
@@ -164,51 +156,49 @@ static void opcua_server_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-
 extern "C" void app_main()
 {
     // Configure Logging
-    //esp_log_level_set(TAG, ESP_LOG_INFO);
-    //esp_log_level_set("esp_https_server", ESP_LOG_WARN);
+    // esp_log_level_set(TAG, ESP_LOG_INFO);
+    // esp_log_level_set("esp_https_server", ESP_LOG_WARN);
     ESP_LOGI(TAG, "\n%s", cfg::BANNER);
     ESP_LOGI(TAG, "%s is booting up. Firmware build at %s on Git %s", cfg::BOARD_NAME, cfg::CREATION_DT_STR, cfg::GIT_SHORT_HASH);
 
     // Configure NVS and SPIFFS
     size_t total = 0, used = 0;
-    esp_vfs_littlefs_conf_t conf = {"/spiffs", "storage", nullptr, 0,0,0,0};
+    esp_vfs_littlefs_conf_t conf = {"/spiffs", "storage", nullptr, 0, 0, 0, 0};
     ESP_ERROR_CHECK(esp_vfs_littlefs_register(&conf));
     ESP_ERROR_CHECK(esp_littlefs_info(conf.partition_label, &total, &used));
     ESP_LOGI(TAG, "LittleFS Partition successfully mounted: total: %dbyte, used: %dbyte", total, used);
     ESP_ERROR_CHECK(nvs_flash_init_and_erase_lazily(NVS_PARTITION_NAME));
 
-    //Install Temperature sensor
-    //Temperature Sensor is used in generic hal for generic use and is used in the SystemPlugin
+    // Install Temperature sensor
+    // Temperature Sensor is used in generic hal for generic use and is used in the SystemPlugin
     temperature_sensor_handle_t tempHandle;
     temperature_sensor_config_t temp_sensor_config = {-10, 80, TEMPERATURE_SENSOR_CLK_SRC_DEFAULT, {0}};
     ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &tempHandle));
     ESP_ERROR_CHECK(temperature_sensor_enable(tempHandle));
 
-    //Generating deviceManager
+    // Generating deviceManager
     devicemanager = new DeviceManager(hal);
-    
-    std::vector<webmanager::iWebmanagerPlugin*> plugins;
+
+    std::vector<webmanager::iWebmanagerPlugin *> plugins;
     plugins.push_back(new HeaterExperimentPlugin(devicemanager));
     plugins.push_back(new FunctionblockPlugin(devicemanager));
     plugins.push_back(new SystemInfoPlugin(tempHandle));
     plugins.push_back(new UsersettingsPlugin("nvs"));
-    
-    
-    //Configure Network
-    webmanager::M* wm = webmanager::M::GetSingleton();
+
+    // Configure Network
+    webmanager::M *wm = webmanager::M::GetSingleton();
     ESP_ERROR_CHECK(wm->Begin(cfg::HOSTNAME, "labathome", cfg::HOSTNAME, false, &plugins, true));
 
     const char *hostname = wm->GetHostname();
 #ifdef HTTPS
     httpd_ssl_config_t httpd_conf = HTTPD_SSL_CONFIG_DEFAULT();
     httpd_conf.servercert = esp32_pem_crt_start;
-    httpd_conf.servercert_len = esp32_pem_crt_end-esp32_pem_crt_start;
+    httpd_conf.servercert_len = esp32_pem_crt_end - esp32_pem_crt_start;
     httpd_conf.prvtkey_pem = esp32_pem_key_start;
-    httpd_conf.prvtkey_len = esp32_pem_key_end-esp32_pem_key_start;
+    httpd_conf.prvtkey_len = esp32_pem_key_end - esp32_pem_key_start;
     httpd_conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
     httpd_conf.httpd.max_uri_handlers = 15;
     ESP_ERROR_CHECK(httpd_ssl_start(&http_server, &httpd_conf));
@@ -220,45 +210,41 @@ extern "C" void app_main()
     ESP_ERROR_CHECK(httpd_start(&http_server, &httpd_conf));
     ESP_LOGI(TAG, "HTTP Server (not secure!) listening on http://%s:%d", hostname, httpd_conf.server_port);
 #else
-    #error "Either define HTTP or HTTPS"
+#error "Either define HTTP or HTTPS"
 #endif
 
     // Start all managers
-    
+
     hal->InitAndRun();
     devicemanager->InitAndRun();
     ESP_LOGI(TAG, "RED %d YEL %d GRN %d", hal->GetButtonRedIsPressed(), hal->GetButtonEncoderIsPressed(), hal->GetButtonGreenIsPressed());
 
     // Allow Browser Access
-    //the "sensor" endpoint is used to get the sensor data as JSON
-    //register this before the webmanager, because the webmanager has a wildcard handler
+    // the "sensor" endpoint is used to get the sensor data as JSON
+    // register this before the webmanager, because the webmanager has a wildcard handler
     httpd_uri_t sensors_get = {
-        "/sensors", 
-        HTTP_GET, 
-        [](httpd_req_t *req){
-            size_t l=2048;
-            char *buf= new char[l];
+        "/sensors",
+        HTTP_GET,
+        [](httpd_req_t *req)
+        {
+            size_t l = 2048;
+            char *buf = new char[l];
             devicemanager->GetHAL()->GetSensorsAsJSON(buf, l);
             httpd_resp_set_type(req, "application/json");
             httpd_resp_send(req, buf, l);
             delete[] buf;
             return ESP_OK;
-        }, 
-        nullptr, false, false, nullptr
-    };
+        },
+        nullptr, false, false, nullptr};
     ESP_ERROR_CHECK(httpd_register_uri_handler(http_server, &sensors_get));
 
     wm->RegisterHTTPDHandlers(http_server);
 
     wm->CallMeAfterInitializationToMarkCurrentPartitionAsValid();
 
-<<<<<<< Updated upstream
-    // Start OPC UA Server
-    StartOPCUAServer();
-=======
-    xTaskCreate(opcua_server_task, "opcua_task", OPCUA_TASK_STACK_SIZE, NULL, OPCUA_TASK_PRIORITY, NULL);
+    // Warte auf IP-Adresse
 
->>>>>>> Stashed changes
+    xTaskCreate(opcua_server_task, "opcua_task", OPCUA_TASK_STACK_SIZE, NULL, OPCUA_TASK_PRIORITY, NULL);
 
     // Start eternal supervisor loop
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -266,6 +252,6 @@ extern "C" void app_main()
     {
         xTaskDelayUntil(&xLastWakeTime, xFrequency);
         hal->DoMonitoring();
-        
     }
 }
+// LABATHOME-IP: 192.168.4.1

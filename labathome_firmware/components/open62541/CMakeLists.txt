@@ -1,8 +1,3 @@
-<<<<<<< Updated upstream
-idf_component_register(SRCS "open62541.c"
-                    INCLUDE_DIRS "include")
-component_compile_options(-Wno-error=format= -Wno-format -Wempty-body)
-=======
 idf_component_register(
   SRCS "open62541.c"
   INCLUDE_DIRS "include"
@@ -17,4 +12,3 @@ target_include_directories(${COMPONENT_LIB} PRIVATE
     $ENV{IDF_PATH}/components/lwip/include
     $ENV{IDF_PATH}/components/lwip/lwip/src/include
 )
->>>>>>> Stashed changes
